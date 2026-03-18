@@ -11,7 +11,6 @@
 * expense_categories
 * project_expenses
 
-* income_categories
 * project_incomes
 
 ### Таблица employees
@@ -28,40 +27,48 @@
 
 ### Таблица projects
 
-| поле               | тип       |
-| ------------------ | --------- |
-| id                 | PK        |
-| redmine_project_id | int       |
-| name               | text      |
-| name_1с            | text      |
-| project_number     | text      |
-| start_budget       | numeric   |
-| created_at         | timestamp |
+| поле                 | тип           |
+| -------------------- | ------------- |
+| id                   | PK            |
+| redmine_project_id   | int           |
+| name                 | text          |
+| name_1с              | text          |
+| name_sanda           | text          |
+| project_number       | text          |
+| lead_department      | text          |
+| project_manager_id   | FK            |
+| start_budget         | numeric(14,2) |
+| created_at           | timestamp     |
+| updated_at           | timestamp     |
+| budget_updated_by_id | FK            |
 
 ### Таблица employee_salaries
 
-| поле         | тип       |
-| ------------ | --------- |
-| id           | PK        |
-| employee_id  | FK        |
-| year         | int       |
-| month        | int       |
-| base_salary  | numeric   |
-| extra_salary | numeric   |
-| created_at   | timestamp |
+| поле         | тип           |
+| ------------ | ------------- |
+| id           | PK            |
+| employee_id  | FK            |
+| year         | int           |
+| month        | int           |
+| base_salary  | numeric(14,2) |
+| extra_salary | numeric(14,2) |
+| created_at   | timestamp     |
+| updated_at   | timestamp     |
 
 ### Таблица employee_bonuses
 
-| поле        | тип                 |
-| ----------- | ------------------- |
-| id          | PK                  |
-| employee_id | FK                  |
-| project_id  | FK                  |
-| year        | int                 |
-| month       | int                 |
-| bonus       | numeric             |
-| extra_bonus | numeric             |
-| expense_id  | FK (источник денег) |
+| поле          | тип           |
+| ------------- | ------------- |
+| id            | PK            |
+| employee_id   | FK            |
+| year          | int           |
+| month         | int           |
+| bonus         | numeric(14,2) |
+| bonus_year    | int           |
+| bonus_quarter | int           |
+| extra_bonus   | numeric(14,2) |
+| created_at    | timestamp     |
+| updated_at    | timestamp     |
 
 ### Таблица expense_categories
 
@@ -82,44 +89,59 @@
 
 ### Таблица project_expenses
 
-| поле                    | тип       |
-| ----------------------- | --------- |
-| id                      | PK        |
-| project_id              | FK        |
-| category_id             | FK        |
-| amount                  | numeric   |
-| responsible_employee_id | FK        |
-| description             | text      |
-| expense_date            | date      |
-| created_at              | timestamp |
-
-Возможно стоит добавить поле **edited_at** для отслеживания даты изменения статьи расхода при наличии функции корректировки статей расхода.
-
-### Таблица income_categories
-
-| поле | тип  |
-| ---- | ---- |
-| id   | PK   |
-| name | text |
-
-Например:
-
-* Оплата клиента
-* Дополнительные услуги
-* Бонус заказчика
+| поле                    | тип           |
+| ----------------------- | ------------- |
+| id                      | PK            |
+| project_id              | FK            |
+| category_id             | FK            |
+| amount                  | numeric(14,2) |
+| responsible_employee_id | FK            |
+| description             | text          |
+| expense_date            | date          |
+| created_at              | timestamp     |
+| created_by_id           | FK            |
 
 ### Таблица project_incomes
 
-| поле                    | тип       |
-| ----------------------- | --------- |
-| id                      | PK        |
-| project_id              | FK        |
-| category_id             | FK        |
-| amount                  | numeric   |
-| responsible_employee_id | FK        |
-| income_date             | date      |
-| description             | text      |
-| created_at              | timestamp |
+| поле                    | тип           |
+| ----------------------- | ------------- |
+| id                      | PK            |
+| project_id              | FK            |
+| amount                  | numeric(14,2) |
+| responsible_employee_id | FK            |
+| description             | text          |
+| income_date             | date          |
+| created_at              | timestamp     |
+| created_by_id           | FK            |
+
+### Таблица employee_compensations
+
+| поле        | тип           |
+| ----------- | ------------- |
+| id          | PK            |
+| employee_id | FK            |
+| year        | int           |
+| month       | int           |
+| type_id     | FK            |
+| amount      | numeric(14,2) |
+| created_at  | timestamp     |
+| updated_at  | timestamp     |
+
+### Таблица compensation_types
+
+| поле        | тип  |
+| ----------- | ---- |
+| id          | PK   |
+| code        | text |
+| name        | text |
+
+Заполненная таблица:
+
+| id | code          | name         |
+| -- | ------------- | ------------ |
+| 1  | vacation      | Отпуск       |
+| 2  | sick_leave    | Больничный   |
+| 3  | business_trip | Командировка |
 
 ## ER схема БД
 
@@ -133,9 +155,7 @@ employees
                        |                   |  
 projects ──────────────┼──────────── project_expenses  
                        │  
-                       └──────────── project_incomes  
-                                           |  
-                                     income_categories  
+                       └──────────── project_incomes
 
 ## Связи в БД
 
@@ -145,5 +165,4 @@ employees 1---N employee_bonuses
 projects 1---N project_expenses  
 projects 1---N project_incomes
 
-expense_categories 1---N project_expenses  
-income_categories 1---N project_incomes
+expense_categories 1---N project_expenses
