@@ -13,6 +13,9 @@
 
 * project_incomes
 
+* employee_compensations
+* compensation_types
+
 ### Таблица employees
 
 | поле       | тип  | описание      |
@@ -147,6 +150,10 @@
 
 employees  
    │  
+   |             compensation_types
+   |                   |
+   ├──────────── employee_compensations
+   |
    ├──────────── employee_salaries  
    │  
    └──────────── employee_bonuses  
@@ -161,8 +168,10 @@ projects ──────────────┼────────�
 
 employees 1---N employee_salaries  
 employees 1---N employee_bonuses
+employees 1---N employee_compensations
 
 projects 1---N project_expenses  
 projects 1---N project_incomes
 
 expense_categories 1---N project_expenses
+compensation_types 1---N employee_compensations
