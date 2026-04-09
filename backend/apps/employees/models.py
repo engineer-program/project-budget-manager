@@ -126,4 +126,3 @@ class EmployeeCompensation(TimestampedModel):
                 name="idx_comp_employee_year_month",
             ),
         ]
-

@@ -1,4 +1,4 @@
-from django.conf import settings
+﻿from django.conf import settings
 from django.db import models
 
 from apps.common.models import TimestampedModel
@@ -11,6 +11,14 @@ class Project(TimestampedModel):
     name_sanda = models.CharField(max_length=255, blank=True)
     project_number = models.CharField(max_length=100, blank=True, db_index=True)
     lead_department = models.CharField(max_length=255, blank=True)
+    parent_project = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="subprojects",
+        db_column="parent_project_id",
+    )
     project_manager = models.ForeignKey(
         "employees.Employee",
         on_delete=models.SET_NULL,
@@ -35,4 +43,3 @@ class Project(TimestampedModel):
 
     def __str__(self):
         return self.name
-

@@ -55,7 +55,7 @@ ASGI_APPLICATION = "config.asgi.application"
 
 
 def _build_default_database():
-    engine = os.getenv("DB_ENGINE", "sqlite").lower()
+    engine = os.getenv("DB_ENGINE", "mysql").lower()
     if engine == "mysql":
         return {
             "ENGINE": "django.db.backends.mysql",
