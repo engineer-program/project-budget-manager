@@ -1,4 +1,4 @@
-# Архитектура базы данных бюджетов
+﻿# Архитектура базы данных бюджетов
 
 ## Основные таблицы БД
 
@@ -47,6 +47,7 @@
 | name_sanda           | text               |
 | project_number       | text               |
 | lead_department      | text               |
+| parent_project_id    | FK -> projects.id  |
 | project_manager_id   | FK -> employees.id |
 | start_budget         | numeric(14,2)      |
 | created_at           | timestamp          |
@@ -57,6 +58,7 @@
 
 * UNIQUE(redmine_project_id)
 * INDEX(project_number)
+* INDEX(parent_project_id)
 * INDEX(project_manager_id)
 
 ### Таблица employee_salaries
