@@ -15,7 +15,7 @@ class RedmineTimeEntry(models.Model):
         related_name="redmine_time_entries",
         db_column="user_id",
     )
-    issue_id = models.IntegerField(db_index=True)
+    issue_id = models.IntegerField(null=True, blank=True, db_index=True)
     hours = models.DecimalField(max_digits=8, decimal_places=2)
     activity_id = models.IntegerField(db_index=True)
     spent_on = models.DateField()
@@ -35,6 +35,7 @@ class SyncState(models.Model):
     last_synced_at = models.DateTimeField(null=True, blank=True)
     last_success_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=50, blank=True)
+    cursor_int = models.BigIntegerField(null=True, blank=True)
     message = models.TextField(blank=True)
 
     class Meta:
@@ -52,4 +53,3 @@ class SyncLog(models.Model):
     class Meta:
         db_table = "sync_log"
         ordering = ["-started_at"]
-
