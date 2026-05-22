@@ -16,7 +16,7 @@ urlpatterns = [
     ),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("sync/redmine/", include("apps.redmine_sync.urls")),
-    path("pages/employees-salaries/", section_placeholder_view, {"title": "З/П сотрудников"}, name="employees-salaries"),
+    path("pages/", include("apps.employees.urls")),
     path("pages/projects/", section_placeholder_view, {"title": "Проекты"}, name="projects-list"),
     path("pages/employee-report/", section_placeholder_view, {"title": "Отчет по сотрудникам"}, name="employee-report"),
     path("pages/project-report/", section_placeholder_view, {"title": "Отчет по проектам"}, name="project-report"),
