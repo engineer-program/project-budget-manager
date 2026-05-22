@@ -1,16 +1,210 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Project Budget Manager</title>
+    <title>Основные страницы | Бюджетирование проектов ТКЗ</title>
+    <style>
+        :root {
+            --bg-top: #f5efe5;
+            --bg-bottom: #dce6ef;
+            --panel: rgba(255, 255, 255, 0.92);
+            --panel-border: rgba(123, 95, 61, 0.16);
+            --text-main: #21313d;
+            --text-muted: #667786;
+            --accent: #4ba7e9;
+            --accent-hover: #3a86bc;
+            --accent-soft: rgba(75, 167, 233, 0.1);
+            --shadow: 0 24px 60px rgba(33, 49, 61, 0.14);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+            background:
+                radial-gradient(circle at top left, rgba(75, 167, 233, 0.12), transparent 34%),
+                linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+        }
+
+        .page {
+            max-width: 1040px;
+            margin: 0 auto;
+            padding: 28px 24px 40px;
+            position: relative;
+        }
+
+        .page-logo {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .admin-link,
+        .logout-form {
+            margin: 0;
+        }
+
+        .admin-link,
+        .logout-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(33, 49, 61, 0.08);
+            border-radius: 12px;
+            padding: 10px 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.75);
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .admin-link:hover,
+        .logout-button:hover {
+            background: #fff;
+            border-color: rgba(75, 167, 233, 0.3);
+        }
+
+        .hero {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            padding: 36px 34px;
+            margin-bottom: 26px;
+        }
+
+        .hero h1 {
+            margin: 0 0 10px;
+            font-size: 2.25rem;
+            line-height: 1.1;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 680px;
+            color: var(--text-muted);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 18px;
+        }
+
+        .menu-card {
+            display: flex;
+            align-items: flex-end;
+            min-height: 144px;
+            padding: 22px;
+            border-radius: 22px;
+            text-decoration: none;
+            color: var(--text-main);
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+        }
+
+        .menu-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at top right, rgba(75, 167, 233, 0.18), transparent 30%),
+                linear-gradient(135deg, transparent 0%, var(--accent-soft) 100%);
+            pointer-events: none;
+        }
+
+        .menu-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 28px 64px rgba(33, 49, 61, 0.18);
+            border-color: rgba(75, 167, 233, 0.22);
+        }
+
+        .menu-card span {
+            position: relative;
+            font-size: 1.15rem;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        @media (max-width: 640px) {
+            .page {
+                padding: 20px 16px 32px;
+            }
+
+            .page-logo {
+                top: 20px;
+                left: 16px;
+                width: 38px;
+                height: 38px;
+            }
+
+            .hero {
+                padding: 28px 22px;
+                border-radius: 22px;
+            }
+
+            .hero h1 {
+                font-size: 1.85rem;
+            }
+        }
+    </style>
 </head>
 <body>
-    <main>
-        <h1>Project Budget Manager</h1>
-        <p>Django backend skeleton is ready.</p>
-        <p><a href="/admin/">Open admin</a></p>
-        <p><a href="/health/">Healthcheck</a></p>
-    </main>
+    <div class="page">
+        <img class="page-logo" src="{% static 'images/company_logo.ico' %}" alt="Логотип компании">
+
+        <div class="topbar">
+            {% if request.user.is_superuser or request.user.is_staff %}
+                <a class="admin-link" href="{% url 'admin:index' %}">Администрирование</a>
+            {% endif %}
+            <form class="logout-form" method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button class="logout-button" type="submit">Выйти</button>
+            </form>
+        </div>
+
+        <section class="hero">
+            <h1>Основные страницы</h1>
+            <p>
+                Выберите нужный раздел. Здесь собраны основные точки входа в систему
+                для работы с проектами, заработной платой и отчетностью.
+            </p>
+        </section>
+
+        <section class="grid">
+            {% for page in pages %}
+                <a class="menu-card" href="{% url page.url_name %}">
+                    <span>{{ page.title }}</span>
+                </a>
+            {% endfor %}
+        </section>
+    </div>
 </body>
 </html>

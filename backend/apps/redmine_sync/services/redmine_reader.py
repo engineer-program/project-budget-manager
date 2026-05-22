@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import datetime
 from typing import Any
 
-from django.db import connections
+import MySQLdb
+from django.conf import settings
 
 
 class RedmineReader:
@@ -88,11 +90,27 @@ class RedmineReader:
            AND cv_manag.customized_id = p.id
            AND cv_manag.customized_type = 'Project'
 
-        WHERE p.status IN (1, 5)
+        WHERE p.status IN (1, 5, 9, 15)
         """
         return self._fetch_all(query)
 
-    def fetch_time_entries(self) -> list[dict[str, Any]]:
+    def fetch_time_entries_chunk(
+        self,
+        *,
+        after_id: int | None = None,
+        changed_since: datetime | None = None,
+        limit: int = 5000,
+    ) -> list[dict[str, Any]]:
+        where_clauses: list[str] = []
+        params: list[Any] = []
+
+        if changed_since is not None:
+            where_clauses.append("(te.created_on >= %s OR te.updated_on >= %s)")
+            params.extend([changed_since, changed_since])
+        if after_id is not None:
+            where_clauses.append("te.id > %s")
+            params.append(after_id)
+
         query = """
         SELECT
             te.id AS redmine_time_entry_id,
@@ -102,17 +120,39 @@ class RedmineReader:
             te.hours,
             te.activity_id,
             te.spent_on,
-            te.created_on AS created_at
+            te.created_on AS created_at,
+            te.updated_on AS updated_at
         FROM time_entries te
         """
-        return self._fetch_all(query)
+
+        if where_clauses:
+            query += "\nWHERE " + " AND ".join(where_clauses)
+
+        query += """
+        ORDER BY te.id
+        LIMIT %s
+        """
+        params.append(limit)
+        return self._fetch_all(query, params)
 
     def _fetch_all(
         self,
         query: str,
         params: Iterable[Any] | None = None,
     ) -> list[dict[str, Any]]:
-        with connections[self.connection_alias].cursor() as cursor:
-            cursor.execute(query, params or [])
-            columns = [col[0] for col in cursor.description]
-            return [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
+        connection_settings = settings.DATABASES[self.connection_alias]
+        connection = MySQLdb.connect(
+            host=connection_settings["HOST"],
+            port=int(connection_settings["PORT"] or 3306),
+            user=connection_settings["USER"],
+            passwd=connection_settings["PASSWORD"],
+            db=connection_settings["NAME"],
+            charset=connection_settings.get("OPTIONS", {}).get("charset", "utf8mb4"),
+        )
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(query, params or [])
+                columns = [col[0] for col in cursor.description]
+                return [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
+        finally:
+            connection.close()

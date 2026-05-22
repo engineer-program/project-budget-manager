@@ -1,0 +1,382 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>З/П сотрудников | Бюджетирование проектов ТКЗ</title>
+    <style>
+        :root {
+            --bg-top: #f5efe5;
+            --bg-bottom: #dce6ef;
+            --panel: rgba(255, 255, 255, 0.93);
+            --panel-border: rgba(123, 95, 61, 0.16);
+            --text-main: #21313d;
+            --text-muted: #667786;
+            --accent: #4ba7e9;
+            --accent-hover: #3a86bc;
+            --accent-soft: rgba(75, 167, 233, 0.1);
+            --shadow: 0 24px 60px rgba(33, 49, 61, 0.14);
+            --success-bg: #e9f7ef;
+            --success-text: #22643e;
+            --error-bg: #fbeaea;
+            --error-text: #9c2f2f;
+            --input-border: #d1d8de;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+            background:
+                radial-gradient(circle at top left, rgba(75, 167, 233, 0.12), transparent 34%),
+                linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+        }
+
+        .page {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 28px 24px 40px;
+            position: relative;
+        }
+
+        .page-logo {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .topbar-actions {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 12px;
+            margin-left: auto;
+        }
+
+        .back-link,
+        .admin-link,
+        .logout-button,
+        .submit-button,
+        .save-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(33, 49, 61, 0.08);
+            border-radius: 12px;
+            padding: 10px 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-decoration: none;
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.78);
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .submit-button,
+        .save-button {
+            color: #fff;
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .back-link:hover,
+        .admin-link:hover,
+        .logout-button:hover,
+        .submit-button:hover,
+        .save-button:hover {
+            background: #fff;
+            border-color: rgba(75, 167, 233, 0.3);
+        }
+
+        .submit-button:hover,
+        .save-button:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        .logout-form {
+            margin: 0;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            padding: 36px 34px;
+        }
+
+        .panel + .panel {
+            margin-top: 24px;
+        }
+
+        .heading {
+            text-align: center;
+            margin: 0 0 30px;
+            font-size: 2rem;
+            line-height: 1.15;
+        }
+
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 18px;
+            justify-content: center;
+        }
+
+        .field {
+            min-width: 220px;
+        }
+
+        .field label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .field select {
+            width: 100%;
+            border: 1px solid var(--input-border);
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 1rem;
+            background: #fff;
+            color: var(--text-main);
+        }
+
+        .messages {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .message {
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 0.95rem;
+        }
+
+        .message.success {
+            background: var(--success-bg);
+            color: var(--success-text);
+        }
+
+        .message.error {
+            background: var(--error-bg);
+            color: var(--error-text);
+        }
+
+        .table-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 14px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: 20px;
+            border: 1px solid rgba(33, 49, 61, 0.08);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1240px;
+            background: rgba(255, 255, 255, 0.74);
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #eff5f9;
+            color: var(--text-main);
+            font-size: 0.92rem;
+            font-weight: 700;
+            text-align: left;
+            padding: 14px 12px;
+            border-bottom: 1px solid rgba(33, 49, 61, 0.08);
+        }
+
+        tbody td {
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(33, 49, 61, 0.06);
+            vertical-align: middle;
+        }
+
+        tbody tr:nth-child(even) {
+            background: rgba(75, 167, 233, 0.03);
+        }
+
+        .name-cell {
+            min-width: 280px;
+            font-weight: 600;
+        }
+
+        .position-cell {
+            min-width: 180px;
+            color: var(--text-muted);
+        }
+
+        .amount-input {
+            width: 140px;
+            border: 1px solid var(--input-border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            background: #fff;
+        }
+
+        @media (max-width: 700px) {
+            .page {
+                padding: 20px 16px 32px;
+            }
+
+            .page-logo {
+                top: 20px;
+                left: 16px;
+                width: 38px;
+                height: 38px;
+            }
+
+            .topbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .topbar-actions {
+                width: 100%;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+            }
+
+            .panel {
+                padding: 28px 22px;
+                border-radius: 22px;
+            }
+
+            .heading {
+                font-size: 1.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <img class="page-logo" src="{% static 'images/company_logo.ico' %}" alt="Логотип компании">
+
+        <div class="topbar">
+            <a class="back-link" href="{% url 'home' %}">На главную</a>
+
+            <div class="topbar-actions">
+                {% if request.user.is_superuser or request.user.is_staff %}
+                    <a class="admin-link" href="{% url 'admin:index' %}">Администрирование</a>
+                {% endif %}
+                <form class="logout-form" method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button class="logout-button" type="submit">Выйти</button>
+                </form>
+            </div>
+        </div>
+
+        <section class="panel">
+            <h1 class="heading">Заработные месячные платы сотрудников</h1>
+
+            {% if messages %}
+                <div class="messages">
+                    {% for message in messages %}
+                        <div class="message {% if message.tags %}{{ message.tags }}{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="filters">
+                    <div class="field">
+                        <label for="{{ form.month.id_for_label }}">Месяц</label>
+                        {{ form.month }}
+                    </div>
+                    <div class="field">
+                        <label for="{{ form.year.id_for_label }}">Год</label>
+                        {{ form.year }}
+                    </div>
+                    <button class="submit-button" type="submit" name="action" value="load">
+                        Получить список пользователей
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        {% if show_table %}
+            <section class="panel">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="month" value="{{ form.month.value }}">
+                    <input type="hidden" name="year" value="{{ form.year.value }}">
+
+                    <div class="table-actions">
+                        <button class="save-button" type="submit" name="action" value="save">Сохранить</button>
+                    </div>
+
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ФИО сотрудника</th>
+                                    <th>Должность</th>
+                                    <th>Номинальная З/П</th>
+                                    <th>Доп. З/П</th>
+                                    <th>Премия квартальная</th>
+                                    <th>Доп. премия</th>
+                                    <th>Отпускные</th>
+                                    <th>Больничные</th>
+                                    <th>Командировочные</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in rows %}
+                                    <tr>
+                                        <td class="name-cell">{{ row.full_name }}</td>
+                                        <td class="position-cell">{{ row.position }}</td>
+                                        <td><input class="amount-input" type="number" step="0.01" name="base_salary_{{ row.employee_id }}" value="{{ row.base_salary }}"></td>
+                                        <td><input class="amount-input" type="number" step="0.01" name="extra_salary_{{ row.employee_id }}" value="{{ row.extra_salary }}"></td>
+                                        <td><input class="amount-input" type="number" step="0.01" name="bonus_{{ row.employee_id }}" value="{{ row.bonus }}"></td>
+                                        <td><input class="amount-input" type="number" step="0.01" name="extra_bonus_{{ row.employee_id }}" value="{{ row.extra_bonus }}"></td>
+                                        <td><input class="amount-input" type="number" step="0.01" name="vacation_{{ row.employee_id }}" value="{{ row.vacation }}"></td>
+                                        <td><input class="amount-input" type="number" step="0.01" name="sick_leave_{{ row.employee_id }}" value="{{ row.sick_leave }}"></td>
+                                        <td><input class="amount-input" type="number" step="0.01" name="business_trip_{{ row.employee_id }}" value="{{ row.business_trip }}"></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </form>
+            </section>
+        {% endif %}
+    </div>
+</body>
+</html>

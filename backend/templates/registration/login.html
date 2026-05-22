@@ -1,0 +1,211 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Вход | Бюджетирование проектов ТКЗ</title>
+    <style>
+        :root {
+            --bg-top: #f6f1e8;
+            --bg-bottom: #dfe7ee;
+            --card: rgba(255, 255, 255, 0.92);
+            --card-border: rgba(123, 95, 61, 0.18);
+            --text-main: #23313d;
+            --text-muted: #677786;
+            --accent: #4ba7e9;
+            --accent-hover: #397fb2;
+            --shadow: 0 24px 60px rgba(35, 49, 61, 0.16);
+            --error-bg: #fbeaea;
+            --error-text: #9c2f2f;
+            --input-border: #d1d8de;
+            --input-focus: rgba(75, 167, 233, 0.24);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+            background:
+                radial-gradient(circle at top left, rgba(75, 167, 233, 0.12), transparent 38%),
+                linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            position: relative;
+        }
+
+        .page-logo {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+        }
+
+        .login-shell {
+            width: 100%;
+            max-width: 440px;
+        }
+
+        .login-card {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 22px;
+            box-shadow: var(--shadow);
+            padding: 36px 32px 28px;
+            backdrop-filter: blur(8px);
+        }
+
+        .brand {
+            margin: 0 0 10px;
+            font-size: 2rem;
+            line-height: 1.15;
+            text-align: center;
+            color: var(--text-main);
+        }
+
+        .subtitle {
+            margin: 0 0 28px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.98rem;
+        }
+
+        .field {
+            margin-bottom: 18px;
+        }
+
+        .field label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .field input {
+            width: 100%;
+            border: 1px solid var(--input-border);
+            border-radius: 14px;
+            padding: 14px 16px;
+            font-size: 1rem;
+            background: #fff;
+            color: var(--text-main);
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .field input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px var(--input-focus);
+        }
+
+        .error-box {
+            margin-bottom: 18px;
+            border-radius: 14px;
+            background: var(--error-bg);
+            color: var(--error-text);
+            padding: 12px 14px;
+            font-size: 0.95rem;
+        }
+
+        .submit-row {
+            margin-top: 10px;
+        }
+
+        .submit-row button {
+            width: 100%;
+            border: 0;
+            border-radius: 14px;
+            padding: 14px 16px;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #fff;
+            background: var(--accent);
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.15s ease;
+        }
+
+        .submit-row button:hover {
+            background: var(--accent-hover);
+        }
+
+        .submit-row button:active {
+            transform: translateY(1px);
+        }
+
+        .help-text {
+            margin: 18px 0 0;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.92rem;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 520px) {
+            .page-logo {
+                top: 16px;
+                left: 16px;
+                width: 38px;
+                height: 38px;
+            }
+
+            .login-card {
+                padding: 28px 22px 24px;
+                border-radius: 18px;
+            }
+
+            .brand {
+                font-size: 1.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <img class="page-logo" src="{% static 'images/company_logo.ico' %}" alt="Логотип компании">
+
+    <main class="login-shell">
+        <section class="login-card">
+            <h1 class="brand">Бюджетирование проектов ТКЗ</h1>
+            <p class="subtitle">Введите логин и пароль для входа в систему.</p>
+
+            {% if form.errors %}
+                <div class="error-box">
+                    Неверный логин или пароль. Проверьте введенные данные и попробуйте еще раз.
+                </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ next }}">
+
+                <div class="field">
+                    <label for="{{ form.username.id_for_label }}">Логин</label>
+                    {{ form.username }}
+                </div>
+
+                <div class="field">
+                    <label for="{{ form.password.id_for_label }}">Пароль</label>
+                    {{ form.password }}
+                </div>
+
+                <div class="submit-row">
+                    <button type="submit">Войти</button>
+                </div>
+            </form>
+
+            <p class="help-text">
+                Доступ в систему создает администратор. Если у вас еще нет учетной записи,
+                обратитесь к администратору для выдачи логина и привязки к сотруднику.
+            </p>
+        </section>
+    </main>
+</body>
+</html>

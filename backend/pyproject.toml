@@ -1,0 +1,20 @@
+[project]
+name = "project-budget-manager-backend"
+version = "0.1.0"
+description = "Django backend for project budget manager"
+requires-python = ">=3.12"
+dependencies = [
+    "Django>=6.0,<6.1",
+    "mysqlclient>=2.2.0",
+    "gunicorn>=23.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["apps*", "config*"]

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title }} | Бюджетирование проектов ТКЗ</title>
+    <style>
+        :root {
+            --bg-top: #f5efe5;
+            --bg-bottom: #dce6ef;
+            --panel: rgba(255, 255, 255, 0.93);
+            --panel-border: rgba(123, 95, 61, 0.16);
+            --text-main: #21313d;
+            --text-muted: #667786;
+            --accent: #4ba7e9;
+            --accent-hover: #3a86bc;
+            --shadow: 0 24px 60px rgba(33, 49, 61, 0.14);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+            background:
+                radial-gradient(circle at top left, rgba(75, 167, 233, 0.12), transparent 34%),
+                linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+        }
+
+        .page {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 28px 24px 40px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .back-link,
+        .logout-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            padding: 10px 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .back-link {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.78);
+            border: 1px solid rgba(33, 49, 61, 0.08);
+        }
+
+        .logout-form {
+            margin: 0;
+        }
+
+        .logout-button {
+            border: 1px solid rgba(33, 49, 61, 0.08);
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.78);
+            cursor: pointer;
+        }
+
+        .content {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            padding: 38px 34px;
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-size: 2rem;
+            line-height: 1.15;
+        }
+
+        p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="topbar">
+            <a class="back-link" href="{% url 'home' %}">На главную</a>
+            <form class="logout-form" method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button class="logout-button" type="submit">Выйти</button>
+            </form>
+        </div>
+
+        <section class="content">
+            <h1>{{ title }}</h1>
+            <p>Раздел в разработке.</p>
+        </section>
+    </div>
+</body>
+</html>

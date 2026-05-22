@@ -1,4 +1,5 @@
-﻿from django.db import models
+from django.conf import settings
+from django.db import models
 from django.db.models import Q
 
 from apps.common.models import TimestampedModel
@@ -19,6 +20,28 @@ class Employee(models.Model):
     def __str__(self):
         parts = [self.last_name, self.first_name, self.patronymic]
         return " ".join(part for part in parts if part).strip()
+
+
+class EmployeeUserBinding(TimestampedModel):
+    employee = models.OneToOneField(
+        "employees.Employee",
+        on_delete=models.PROTECT,
+        related_name="user_binding",
+        db_column="employee_id",
+    )
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="employee_binding",
+        db_column="user_id",
+    )
+
+    class Meta:
+        db_table = "employee_user_bindings"
+        ordering = ["employee_id"]
+
+    def __str__(self):
+        return f"{self.employee} -> {self.user}"
 
 
 class EmployeeSalary(TimestampedModel):
