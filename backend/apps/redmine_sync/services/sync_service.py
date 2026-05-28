@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -35,6 +36,9 @@ class SyncService:
     TIME_ENTRIES_MODE_FULL = "full"
     DEFAULT_CHUNK_SIZE = 5000
     DEFAULT_WINDOW_DAYS = 365
+    PROJECT_TIMESTAMP_PREFIX_RE = re.compile(
+        r"^'?\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}\s+(?P<name>.+)$"
+    )
 
     def __init__(self, reader: RedmineReader | None = None) -> None:
         self.reader = reader or RedmineReader()
@@ -90,6 +94,7 @@ class SyncService:
                 "first_name": item["first_name"] or "",
                 "last_name": item["last_name"] or "",
                 "patronymic": item.get("patronymic") or "",
+                "position": item.get("position") or "",
                 "email": item.get("email") or "",
                 "active": bool(item.get("active")),
             }
@@ -112,7 +117,7 @@ class SyncService:
             if employees_to_update:
                 Employee.objects.bulk_update(
                     employees_to_update,
-                    ["first_name", "last_name", "patronymic", "email", "active"],
+                    ["first_name", "last_name", "patronymic", "position", "email", "active"],
                     batch_size=500,
                 )
 
@@ -138,11 +143,14 @@ class SyncService:
 
         for item in payload:
             defaults = {
-                "name": item["name"] or "",
+                "name": self._normalize_project_name(item.get("name")),
                 "project_number": item.get("project_number") or "",
                 "name_1s": item.get("name_1s") or "",
                 "name_sanda": item.get("name_sanda") or "",
                 "lead_department": item.get("lead_department") or "",
+                "redmine_created_on": self._normalize_datetime(item.get("redmine_created_on")),
+                "redmine_updated_on": self._normalize_datetime(item.get("redmine_updated_on")),
+                "synced_at": now,
             }
             redmine_project_id = item["redmine_project_id"]
             relation_links.append(
@@ -175,7 +183,17 @@ class SyncService:
             if projects_to_update:
                 Project.objects.bulk_update(
                     projects_to_update,
-                    ["name", "project_number", "name_1s", "name_sanda", "lead_department", "updated_at"],
+                    [
+                        "name",
+                        "project_number",
+                        "name_1s",
+                        "name_sanda",
+                        "lead_department",
+                        "redmine_created_on",
+                        "redmine_updated_on",
+                        "synced_at",
+                        "updated_at",
+                    ],
                     batch_size=500,
                 )
 
@@ -385,6 +403,7 @@ class SyncService:
                 "first_name": "Анонимный",
                 "last_name": "пользователь",
                 "patronymic": "",
+                "position": "",
                 "email": "",
                 "active": False,
             },
@@ -427,6 +446,13 @@ class SyncService:
                 setattr(instance, field_name, new_value)
                 changed = True
         return changed
+
+    def _normalize_project_name(self, value: object) -> str:
+        name = str(value or "").strip()
+        match = self.PROJECT_TIMESTAMP_PREFIX_RE.match(name)
+        if match:
+            return match.group("name").strip()
+        return name
 
     def _format_details(self, details: dict[str, int] | dict[str, dict[str, int]]) -> str:
         return str(details)

@@ -12,7 +12,7 @@ def _can_run_full_sync(request: HttpRequest) -> bool:
     user = request.user
     if not user.is_authenticated:
         return False
-    return user.is_superuser or user.groups.filter(name="admin").exists()
+    return user.is_superuser or user.is_staff or user.groups.filter(name="admin").exists()
 
 
 def _serialize_sync_state(entity_code: str) -> dict[str, object] | None:

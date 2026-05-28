@@ -36,8 +36,8 @@ class EmployeeUserBindingAdmin(admin.ModelAdmin):
 
 
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ("last_name", "first_name", "patronymic", "email", "active", "redmine_id")
-    search_fields = ("last_name", "first_name", "patronymic", "email", "redmine_id")
+    list_display = ("last_name", "first_name", "patronymic", "position", "email", "active", "redmine_id")
+    search_fields = ("last_name", "first_name", "patronymic", "position", "email", "redmine_id")
     list_filter = ("active",)
 
 

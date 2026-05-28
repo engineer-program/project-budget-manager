@@ -10,6 +10,7 @@ class Employee(models.Model):
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
     patronymic = models.CharField(max_length=255, blank=True)
+    position = models.CharField(max_length=255, blank=True)
     email = models.EmailField(max_length=255, blank=True, db_index=True)
     active = models.BooleanField(default=True, db_index=True)
 

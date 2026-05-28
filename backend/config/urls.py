@@ -16,8 +16,10 @@ urlpatterns = [
     ),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("sync/redmine/", include("apps.redmine_sync.urls")),
+    path("api/employees/", include("apps.employees.api_urls")),
+    path("api/projects/", include("apps.projects.api_urls")),
     path("pages/", include("apps.employees.urls")),
-    path("pages/projects/", section_placeholder_view, {"title": "Проекты"}, name="projects-list"),
+    path("pages/projects/", include("apps.projects.urls")),
     path("pages/employee-report/", section_placeholder_view, {"title": "Отчет по сотрудникам"}, name="employee-report"),
     path("pages/project-report/", section_placeholder_view, {"title": "Отчет по проектам"}, name="project-report"),
     path(
