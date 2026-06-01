@@ -111,6 +111,10 @@
             border-color: var(--accent);
         }
 
+        .back-link {
+            margin-left: 64px;
+        }
+
         .back-link:hover,
         .admin-link:hover,
         .logout-button:hover,
@@ -171,6 +175,82 @@
             font-size: 1rem;
             background: #fff;
             color: var(--text-main);
+        }
+
+        .field.groups-field {
+            min-width: 360px;
+        }
+
+        .status-filter-field {
+            min-width: 220px;
+        }
+
+        .groups-toggle,
+        .status-toggle {
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        .groups-toggle::after,
+        .status-toggle::after {
+            content: "▼";
+            margin-left: 10px;
+            font-size: 0.72rem;
+        }
+
+        .groups-toggle.open::after,
+        .status-toggle.open::after {
+            content: "▲";
+        }
+
+        .groups-checkboxes,
+        .status-options {
+            display: none;
+            gap: 8px;
+            max-height: 180px;
+            overflow: auto;
+            border: 1px solid var(--input-border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-top: 8px;
+            background: #fff;
+        }
+
+        .groups-checkboxes.visible,
+        .status-options.visible {
+            display: grid;
+        }
+
+        .group-checkbox,
+        .status-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font-size: 0.92rem;
+            line-height: 1.25;
+            cursor: pointer;
+        }
+
+        .group-checkbox input,
+        .status-option input {
+            margin-top: 2px;
+        }
+
+        .groups-placeholder {
+            color: var(--text-muted);
+            font-size: 0.92rem;
+        }
+
+        .field select[multiple] {
+            min-height: 118px;
+            padding: 10px 12px;
+        }
+
+        .field-hint {
+            display: block;
+            margin-top: 6px;
+            color: var(--text-muted);
+            font-size: 0.82rem;
         }
 
         .status-message {
@@ -238,6 +318,87 @@
             background: #fff4cf;
         }
 
+        .bonus-cell {
+            color: #226fa7;
+            font-weight: 700;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            cursor: pointer;
+        }
+
+        .bonus-period {
+            color: var(--text-muted);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(26, 38, 48, 0.34);
+            z-index: 20;
+        }
+
+        .modal-backdrop.visible {
+            display: flex;
+        }
+
+        .modal {
+            width: min(520px, 100%);
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 30px 80px rgba(20, 30, 38, 0.28);
+            padding: 24px;
+        }
+
+        .modal-header,
+        .modal-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .modal-header {
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+
+        .modal-title {
+            margin: 0;
+            font-size: 1.25rem;
+        }
+
+        .close-button {
+            border: 0;
+            background: transparent;
+            font-size: 1.6rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .modal-form {
+            display: grid;
+            gap: 14px;
+        }
+
+        .modal-form input,
+        .modal-form select {
+            width: 100%;
+            border: 1px solid var(--input-border);
+            border-radius: 10px;
+            padding: 11px 12px;
+            font-size: 1rem;
+        }
+
+        .modal-actions {
+            justify-content: flex-start;
+            margin-top: 6px;
+        }
+
         @media (max-width: 700px) {
             .page {
                 padding: 20px 16px 32px;
@@ -302,6 +463,36 @@
                     <label for="{{ form.year.id_for_label }}">Год</label>
                     {{ form.year }}
                 </div>
+                <div class="field status-filter-field">
+                    <label>Статус сотрудника</label>
+                    <button id="status-toggle" class="button status-toggle" type="button">
+                        Активен
+                    </button>
+                    <div id="status-filter" class="status-options">
+                        <label class="status-option">
+                            <input type="radio" name="active-status" value="1" checked>
+                            Активен
+                        </label>
+                        <label class="status-option">
+                            <input type="radio" name="active-status" value="0">
+                            Заблокирован
+                        </label>
+                        <label class="status-option">
+                            <input type="radio" name="active-status" value="all">
+                            Все
+                        </label>
+                    </div>
+                </div>
+                <div class="field groups-field">
+                    <label>Группы сотрудников</label>
+                    <button id="groups-toggle" class="button groups-toggle" type="button">
+                        Выбрать группы
+                    </button>
+                    <div id="group-filter" class="groups-checkboxes">
+                        <span class="groups-placeholder">Загрузка групп...</span>
+                    </div>
+                    <span class="field-hint">Можно выбрать несколько групп</span>
+                </div>
                 <button id="load-table-button" class="button primary" type="button">
                     Получить список пользователей
                 </button>
@@ -319,17 +510,81 @@
         </section>
     </div>
 
+    <div id="bonus-modal-backdrop" class="modal-backdrop">
+        <section class="modal">
+            <div class="modal-header">
+                <h2 id="bonus-modal-title" class="modal-title">Премия</h2>
+                <button id="close-bonus-modal" class="close-button" type="button">&times;</button>
+            </div>
+            <div class="modal-form">
+                <div class="field">
+                    <label id="bonus-amount-label" for="bonus-amount">Сумма</label>
+                    <input id="bonus-amount" type="number" step="0.01">
+                </div>
+                <div class="field">
+                    <label for="bonus-quarter">Квартал премии</label>
+                    <select id="bonus-quarter">
+                        <option value="1">I</option>
+                        <option value="2">II</option>
+                        <option value="3">III</option>
+                        <option value="4">IV</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="bonus-year">Год премии</label>
+                    <select id="bonus-year">
+                        {% for value, title in year_choices %}
+                            <option value="{{ value }}">{{ title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button id="save-bonus-modal" class="button primary" type="button">Сохранить</button>
+                    <button id="cancel-bonus-modal" class="button" type="button">Отмена</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div id="bonus-conflict-backdrop" class="modal-backdrop">
+        <section class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Премия уже существует</h2>
+                <button id="close-bonus-conflict" class="close-button" type="button">&times;</button>
+            </div>
+            <p id="bonus-conflict-message"></p>
+            <div class="modal-actions">
+                <button id="confirm-bonus-conflict" class="button primary" type="button">Да</button>
+                <button id="cancel-bonus-conflict" class="button" type="button">Нет</button>
+            </div>
+        </section>
+    </div>
+
     <script src="{% static 'vendor/tabulator/tabulator.min.js' %}"></script>
     <script>
         const monthSelect = document.getElementById("{{ form.month.id_for_label }}");
         const yearSelect = document.getElementById("{{ form.year.id_for_label }}");
+        const statusToggle = document.getElementById("status-toggle");
+        const statusFilter = document.getElementById("status-filter");
+        const groupsToggle = document.getElementById("groups-toggle");
+        const groupFilter = document.getElementById("group-filter");
         const loadButton = document.getElementById("load-table-button");
         const saveButton = document.getElementById("save-table-button");
         const tablePanel = document.getElementById("table-panel");
         const statusMessage = document.getElementById("status-message");
         const dirtyCounter = document.getElementById("dirty-counter");
+        const bonusModalBackdrop = document.getElementById("bonus-modal-backdrop");
+        const bonusModalTitle = document.getElementById("bonus-modal-title");
+        const bonusAmountLabel = document.getElementById("bonus-amount-label");
+        const bonusAmountInput = document.getElementById("bonus-amount");
+        const bonusQuarterSelect = document.getElementById("bonus-quarter");
+        const bonusYearSelect = document.getElementById("bonus-year");
+        const bonusConflictBackdrop = document.getElementById("bonus-conflict-backdrop");
+        const bonusConflictMessage = document.getElementById("bonus-conflict-message");
         const dirtyRows = new Map();
         let table = null;
+        let bonusModalContext = null;
+        let pendingBonusUpdates = null;
 
         function getCsrfToken() {
             const cookie = document.cookie
@@ -349,10 +604,27 @@
         }
 
         function getPeriodParams() {
-            return new URLSearchParams({
+            const params = new URLSearchParams({
                 month: monthSelect.value,
                 year: yearSelect.value,
+                active: statusFilter.querySelector("input[name='active-status']:checked").value,
             });
+            groupFilter.querySelectorAll("input[type='checkbox']:checked").forEach((checkbox) => {
+                params.append("group_ids", checkbox.value);
+            });
+            return params;
+        }
+
+        function updateGroupsToggleText() {
+            const selectedCount = groupFilter.querySelectorAll("input[type='checkbox']:checked").length;
+            groupsToggle.textContent = selectedCount === 0
+                ? "Выбрать группы"
+                : `Выбрано групп: ${selectedCount}`;
+        }
+
+        function updateStatusToggleText() {
+            const selected = statusFilter.querySelector("input[name='active-status']:checked");
+            statusToggle.textContent = selected ? selected.parentElement.textContent.trim() : "Активен";
         }
 
         function normalizeMoney(value) {
@@ -368,6 +640,20 @@
 
         function formatMoney(value) {
             return `${normalizeMoney(value)}₽`;
+        }
+
+        function quarterTitle(value) {
+            return ["", "I", "II", "III", "IV"][Number(value)] || "";
+        }
+
+        function formatBonusCell(cell) {
+            const value = normalizeMoney(cell.getValue());
+            const rowData = cell.getRow().getData();
+            const hasPeriod = Number(value) !== 0 || rowData.bonus_id;
+            const period = hasPeriod
+                ? ` <span class="bonus-period">(${quarterTitle(rowData.bonus_quarter)} кв. ${rowData.bonus_year})</span>`
+                : "";
+            return `<span class="bonus-cell">${formatMoney(value)}${period}</span>`;
         }
 
         function updateDirtyCounter() {
@@ -386,6 +672,16 @@
             updateDirtyCounter();
         }
 
+        function markRowComponentDirty(row, field) {
+            const rowData = row.getData();
+            dirtyRows.set(rowData.employee_id, rowData);
+            const cell = row.getCell(field);
+            if (cell) {
+                cell.getElement().classList.add("dirty-cell");
+            }
+            updateDirtyCounter();
+        }
+
         const moneyColumn = (title, field) => ({
             title,
             field,
@@ -397,6 +693,109 @@
             formatter: (cell) => formatMoney(cell.getValue()),
             cellEdited: markRowDirty,
         });
+
+        const bonusColumn = (title, field) => ({
+            title,
+            field,
+            hozAlign: "right",
+            headerFilter: "input",
+            sorter: "number",
+            formatter: formatBonusCell,
+            cellClick: (_, cell) => openBonusModal(cell, field, title),
+        });
+
+        function openBonusModal(cell, field, title) {
+            const rowData = cell.getRow().getData();
+            bonusModalContext = {row: cell.getRow(), field};
+            bonusModalTitle.textContent = title;
+            bonusAmountLabel.textContent = title;
+            bonusAmountInput.value = normalizeMoney(rowData[field]);
+            bonusQuarterSelect.value = rowData.bonus_quarter || String(Math.floor((Number(monthSelect.value) - 1) / 3) + 1);
+            bonusYearSelect.value = rowData.bonus_year || yearSelect.value;
+            bonusModalBackdrop.classList.add("visible");
+        }
+
+        function closeBonusModal() {
+            bonusModalBackdrop.classList.remove("visible");
+            bonusModalContext = null;
+        }
+
+        async function checkBonusConflict(rowData, field, bonusYear, bonusQuarter) {
+            const params = new URLSearchParams({
+                employee_id: rowData.employee_id,
+                field,
+                bonus_year: bonusYear,
+                bonus_quarter: bonusQuarter,
+                payout_year: yearSelect.value,
+                payout_month: monthSelect.value,
+            });
+            if (rowData.bonus_id) {
+                params.append("bonus_id", rowData.bonus_id);
+            }
+
+            const response = await fetch(`{% url 'employee-bonus-conflict' %}?${params}`);
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "ok") {
+                throw new Error(payload.message || "Не удалось проверить премию.");
+            }
+            return payload;
+        }
+
+        async function applyBonusUpdates() {
+            if (!pendingBonusUpdates) {
+                return;
+            }
+
+            await pendingBonusUpdates.row.update(pendingBonusUpdates.updates);
+            markRowComponentDirty(pendingBonusUpdates.row, pendingBonusUpdates.field);
+            pendingBonusUpdates = null;
+            bonusConflictBackdrop.classList.remove("visible");
+            closeBonusModal();
+        }
+
+        function closeBonusConflict() {
+            pendingBonusUpdates = null;
+            bonusConflictBackdrop.classList.remove("visible");
+        }
+
+        async function saveBonusModal() {
+            if (!bonusModalContext) {
+                return;
+            }
+
+            const rowData = bonusModalContext.row.getData();
+            const bonusQuarter = Number(bonusQuarterSelect.value);
+            const bonusYear = Number(bonusYearSelect.value);
+            const updates = {
+                [bonusModalContext.field]: normalizeMoney(bonusAmountInput.value),
+                bonus_quarter: bonusQuarter,
+                bonus_year: bonusYear,
+            };
+
+            try {
+                const conflict = await checkBonusConflict(
+                    rowData,
+                    bonusModalContext.field,
+                    bonusYear,
+                    bonusQuarter,
+                );
+                pendingBonusUpdates = {
+                    row: bonusModalContext.row,
+                    field: bonusModalContext.field,
+                    updates,
+                };
+
+                if (conflict.has_conflict) {
+                    bonusConflictMessage.textContent = conflict.message;
+                    bonusConflictBackdrop.classList.add("visible");
+                    return;
+                }
+
+                await applyBonusUpdates();
+            } catch (error) {
+                showStatus(error.message, "error");
+            }
+        }
 
         function buildTable(rows) {
             dirtyRows.clear();
@@ -422,13 +821,61 @@
                     {title: "Должность", field: "position", width: 220, headerFilter: "input"},
                     moneyColumn("Номинальная З/П", "base_salary"),
                     moneyColumn("Доп. З/П", "extra_salary"),
-                    moneyColumn("Премия квартальная", "bonus"),
-                    moneyColumn("Доп. премия", "extra_bonus"),
+                    bonusColumn("Премия квартальная", "bonus"),
+                    bonusColumn("Доп. премия", "extra_bonus"),
                     moneyColumn("Отпускные", "vacation"),
                     moneyColumn("Больничные", "sick_leave"),
                     moneyColumn("Командировочные", "business_trip"),
                 ],
             });
+        }
+
+        async function loadGroups() {
+            try {
+                const response = await fetch("{% url 'employee-groups-data' %}");
+                const payload = await response.json();
+                if (!response.ok || payload.status !== "ok") {
+                    throw new Error(payload.message || "Не удалось загрузить группы сотрудников.");
+                }
+
+                groupFilter.innerHTML = "";
+                payload.groups.forEach((group) => {
+                    const label = document.createElement("label");
+                    label.className = "group-checkbox";
+
+                    const checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.value = group.id;
+                    checkbox.checked = group.name.trim() === "ТКЗ ИЦ СПБ";
+                    checkbox.addEventListener("change", () => {
+                        updateGroupsToggleText();
+                        resetVisibleTable();
+                    });
+
+                    const text = document.createElement("span");
+                    text.textContent = group.name;
+
+                    label.appendChild(checkbox);
+                    label.appendChild(text);
+                    groupFilter.appendChild(label);
+                });
+
+                if (payload.groups.length === 0) {
+                    groupFilter.innerHTML = '<span class="groups-placeholder">Группы не найдены</span>';
+                }
+                updateGroupsToggleText();
+            } catch (error) {
+                groupFilter.innerHTML = '<span class="groups-placeholder">Ошибка загрузки групп</span>';
+                updateGroupsToggleText();
+                showStatus(error.message, "error");
+            }
+        }
+
+        function resetVisibleTable() {
+            tablePanel.classList.remove("visible");
+            dirtyRows.clear();
+            updateDirtyCounter();
+            clearStatus();
         }
 
         async function loadTable() {
@@ -483,6 +930,11 @@
                     .querySelectorAll(".dirty-cell")
                     .forEach((cell) => cell.classList.remove("dirty-cell"));
                 updateDirtyCounter();
+                const reloadResponse = await fetch(`{% url 'employee-salaries-data' %}?${getPeriodParams()}`);
+                const reloadPayload = await reloadResponse.json();
+                if (reloadResponse.ok && reloadPayload.status === "ok") {
+                    buildTable(reloadPayload.rows);
+                }
                 showStatus(`Сохранено строк: ${payload.saved}.`, "success");
             } catch (error) {
                 showStatus(error.message, "error");
@@ -494,18 +946,30 @@
 
         loadButton.addEventListener("click", loadTable);
         saveButton.addEventListener("click", saveTable);
-        monthSelect.addEventListener("change", () => {
-            tablePanel.classList.remove("visible");
-            dirtyRows.clear();
-            updateDirtyCounter();
-            clearStatus();
+        document.getElementById("save-bonus-modal").addEventListener("click", saveBonusModal);
+        document.getElementById("close-bonus-modal").addEventListener("click", closeBonusModal);
+        document.getElementById("cancel-bonus-modal").addEventListener("click", closeBonusModal);
+        document.getElementById("confirm-bonus-conflict").addEventListener("click", applyBonusUpdates);
+        document.getElementById("close-bonus-conflict").addEventListener("click", closeBonusConflict);
+        document.getElementById("cancel-bonus-conflict").addEventListener("click", closeBonusConflict);
+        statusToggle.addEventListener("click", () => {
+            statusFilter.classList.toggle("visible");
+            statusToggle.classList.toggle("open");
         });
-        yearSelect.addEventListener("change", () => {
-            tablePanel.classList.remove("visible");
-            dirtyRows.clear();
-            updateDirtyCounter();
-            clearStatus();
+        statusFilter.querySelectorAll("input[name='active-status']").forEach((input) => {
+            input.addEventListener("change", () => {
+                updateStatusToggleText();
+                resetVisibleTable();
+            });
         });
+        groupsToggle.addEventListener("click", () => {
+            groupFilter.classList.toggle("visible");
+            groupsToggle.classList.toggle("open");
+        });
+        monthSelect.addEventListener("change", resetVisibleTable);
+        yearSelect.addEventListener("change", resetVisibleTable);
+        updateStatusToggleText();
+        loadGroups();
     </script>
 </body>
 </html>

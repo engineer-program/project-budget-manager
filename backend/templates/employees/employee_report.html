@@ -1,0 +1,591 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Отчёт по сотрудникам | Бюджетирование проектов ТКЗ</title>
+    <link rel="stylesheet" href="{% static 'vendor/tabulator/tabulator.min.css' %}">
+    <style>
+        :root {
+            --bg-top: #f5efe5;
+            --bg-bottom: #dce6ef;
+            --panel: rgba(255, 255, 255, 0.93);
+            --panel-border: rgba(123, 95, 61, 0.16);
+            --text-main: #21313d;
+            --text-muted: #667786;
+            --accent: #4ba7e9;
+            --accent-hover: #3a86bc;
+            --shadow: 0 24px 60px rgba(33, 49, 61, 0.14);
+            --input-border: #d1d8de;
+            --success-bg: #e9f7ef;
+            --success-text: #22643e;
+            --error-bg: #fbeaea;
+            --error-text: #9c2f2f;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+            background:
+                radial-gradient(circle at top left, rgba(75, 167, 233, 0.12), transparent 34%),
+                linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+        }
+
+        .page {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 28px 24px 40px;
+            position: relative;
+        }
+
+        .page-logo {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+        }
+
+        .topbar,
+        .topbar-actions,
+        .filters,
+        .quarter-options,
+        .table-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .topbar {
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .topbar-actions {
+            justify-content: flex-end;
+            margin-left: auto;
+        }
+
+        .filters {
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .back-link,
+        .admin-link,
+        .logout-button,
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(33, 49, 61, 0.08);
+            border-radius: 10px;
+            padding: 10px 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-decoration: none;
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.78);
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .button.primary {
+            color: #fff;
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .button.primary:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        .back-link {
+            margin-left: 64px;
+        }
+
+        .logout-form {
+            margin: 0;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 30px 28px;
+        }
+
+        .panel + .panel {
+            margin-top: 22px;
+        }
+
+        .heading {
+            text-align: center;
+            margin: 0 0 28px;
+            font-size: 2rem;
+            line-height: 1.15;
+        }
+
+        .field {
+            min-width: 220px;
+        }
+
+        .field.groups-field {
+            min-width: 360px;
+        }
+
+        .status-filter-field {
+            min-width: 220px;
+        }
+
+        .field label,
+        .field-title {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .field select {
+            width: 100%;
+            border: 1px solid var(--input-border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 1rem;
+            background: #fff;
+            color: var(--text-main);
+        }
+
+        .quarter-option,
+        .group-checkbox {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font-size: 0.92rem;
+            line-height: 1.25;
+            cursor: pointer;
+        }
+
+        .quarter-options {
+            min-height: 44px;
+        }
+
+        .groups-toggle {
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        .groups-toggle::after {
+            content: "▼";
+            margin-left: 10px;
+            font-size: 0.72rem;
+        }
+
+        .groups-toggle.open::after {
+            content: "▲";
+        }
+
+        .groups-checkboxes {
+            display: none;
+            gap: 8px;
+            max-height: 180px;
+            overflow: auto;
+            border: 1px solid var(--input-border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-top: 8px;
+            background: #fff;
+        }
+
+        .groups-checkboxes.visible {
+            display: grid;
+        }
+
+        .groups-placeholder,
+        .field-hint {
+            color: var(--text-muted);
+            font-size: 0.86rem;
+        }
+
+        .field-hint {
+            display: block;
+            margin-top: 6px;
+        }
+
+        .status-message {
+            display: none;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            margin-bottom: 16px;
+        }
+
+        .status-message.visible {
+            display: block;
+        }
+
+        .status-message.success {
+            background: var(--success-bg);
+            color: var(--success-text);
+        }
+
+        .status-message.error {
+            background: var(--error-bg);
+            color: var(--error-text);
+        }
+
+        .table-panel {
+            display: none;
+        }
+
+        .table-panel.visible {
+            display: block;
+        }
+
+        #employee-report-table {
+            border: 1px solid rgba(33, 49, 61, 0.08);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .tabulator {
+            background: transparent;
+            border: 0;
+            font-size: 0.92rem;
+        }
+
+        .tabulator .tabulator-header,
+        .tabulator .tabulator-header .tabulator-col {
+            background: #eff5f9;
+        }
+
+        @media (max-width: 700px) {
+            .page {
+                padding: 20px 16px 32px;
+            }
+
+            .page-logo {
+                top: 20px;
+                left: 16px;
+                width: 38px;
+                height: 38px;
+            }
+
+            .topbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .topbar-actions {
+                justify-content: flex-start;
+                margin-left: 0;
+            }
+
+            .panel {
+                padding: 24px 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <img class="page-logo" src="{% static 'images/company_logo.ico' %}" alt="Логотип компании">
+
+        <div class="topbar">
+            <a class="back-link" href="{% url 'home' %}">На главную</a>
+            <div class="topbar-actions">
+                {% if request.user.is_superuser or request.user.is_staff %}
+                    <a class="admin-link" href="{% url 'admin:index' %}">Администрирование</a>
+                {% endif %}
+                <form class="logout-form" method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button class="logout-button" type="submit">Выйти</button>
+                </form>
+            </div>
+        </div>
+
+        <section class="panel">
+            <h1 class="heading">Отчёт по сотрудникам</h1>
+            <div id="status-message" class="status-message"></div>
+
+            <div class="filters">
+                <div class="field">
+                    <label for="year-filter">Год</label>
+                    <select id="year-filter">
+                        {% for value, title in year_choices %}
+                            <option value="{{ value }}"{% if value == current_year %} selected{% endif %}>{{ title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <span class="field-title">Квартал</span>
+                    <div class="quarter-options">
+                        <label class="quarter-option"><input type="checkbox" value="1"> I</label>
+                        <label class="quarter-option"><input type="checkbox" value="2"> II</label>
+                        <label class="quarter-option"><input type="checkbox" value="3"> III</label>
+                        <label class="quarter-option"><input type="checkbox" value="4"> IV</label>
+                    </div>
+                </div>
+
+                <div class="field status-filter-field">
+                    <label>Статус</label>
+                    <button id="status-toggle" class="button groups-toggle" type="button">
+                        Активен
+                    </button>
+                    <div id="status-filter" class="groups-checkboxes">
+                        <label class="group-checkbox">
+                            <input type="radio" name="active-status" value="1" checked>
+                            Активен
+                        </label>
+                        <label class="group-checkbox">
+                            <input type="radio" name="active-status" value="0">
+                            Заблокирован
+                        </label>
+                        <label class="group-checkbox">
+                            <input type="radio" name="active-status" value="all">
+                            Все
+                        </label>
+                    </div>
+                </div>
+
+                <div class="field groups-field">
+                    <label>Группы сотрудников</label>
+                    <button id="groups-toggle" class="button groups-toggle" type="button">
+                        Выбрать группы
+                    </button>
+                    <div id="group-filter" class="groups-checkboxes">
+                        <span class="groups-placeholder">Загрузка групп...</span>
+                    </div>
+                    <span class="field-hint">Можно выбрать несколько групп</span>
+                </div>
+
+                <button id="load-table-button" class="button primary" type="button">
+                    Получить список пользователей
+                </button>
+            </div>
+        </section>
+
+        <section id="table-panel" class="panel table-panel">
+            <div id="employee-report-table"></div>
+        </section>
+    </div>
+
+    <script src="{% static 'vendor/tabulator/tabulator.min.js' %}"></script>
+    <script>
+        const yearSelect = document.getElementById("year-filter");
+        const quarterInputs = Array.from(document.querySelectorAll(".quarter-option input"));
+        const statusToggle = document.getElementById("status-toggle");
+        const statusFilter = document.getElementById("status-filter");
+        const groupsToggle = document.getElementById("groups-toggle");
+        const groupFilter = document.getElementById("group-filter");
+        const loadButton = document.getElementById("load-table-button");
+        const tablePanel = document.getElementById("table-panel");
+        const statusMessage = document.getElementById("status-message");
+        let table = null;
+
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message visible ${type}`;
+        }
+
+        function clearStatus() {
+            statusMessage.textContent = "";
+            statusMessage.className = "status-message";
+        }
+
+        function resetVisibleTable() {
+            tablePanel.classList.remove("visible");
+            clearStatus();
+        }
+
+        function normalizeMoney(value) {
+            const normalized = Number(String(value || "0").replace(",", "."));
+            return Number.isNaN(normalized) ? "0.00" : normalized.toFixed(2);
+        }
+
+        function formatMoney(value) {
+            return `${normalizeMoney(value)}₽`;
+        }
+
+        function updateGroupsToggleText() {
+            const selectedCount = groupFilter.querySelectorAll("input[type='checkbox']:checked").length;
+            groupsToggle.textContent = selectedCount === 0
+                ? "Выбрать группы"
+                : `Выбрано групп: ${selectedCount}`;
+        }
+
+        function updateStatusToggleText() {
+            const selected = statusFilter.querySelector("input[name='active-status']:checked");
+            statusToggle.textContent = selected ? selected.parentElement.textContent.trim() : "Активен";
+        }
+
+        function getReportParams() {
+            const params = new URLSearchParams({
+                year: yearSelect.value,
+                active: statusFilter.querySelector("input[name='active-status']:checked").value,
+            });
+            quarterInputs
+                .filter((input) => input.checked)
+                .forEach((input) => params.append("quarters", input.value));
+            groupFilter
+                .querySelectorAll("input[type='checkbox']:checked")
+                .forEach((checkbox) => params.append("group_ids", checkbox.value));
+            return params;
+        }
+
+        function moneyColumn(title, field) {
+            return {
+                title,
+                field,
+                hozAlign: "right",
+                sorter: "number",
+                formatter: (cell) => formatMoney(cell.getValue()),
+            };
+        }
+
+        function buildColumns(months) {
+            const columns = [
+                {title: "ФИО сотрудника", field: "full_name", frozen: true, width: 280, headerFilter: "input"},
+                {title: "Должность", field: "position", frozen: true, width: 220, headerFilter: "input"},
+            ];
+
+            months.forEach((month) => {
+                columns.push({
+                    title: month.title,
+                    hozAlign: "center",
+                    columns: [
+                        moneyColumn("З/П", `month_${month.month}_base_salary`),
+                        moneyColumn("Доп. З/П", `month_${month.month}_extra_salary`),
+                        moneyColumn("Квартальная премия", `month_${month.month}_bonus`),
+                        moneyColumn("Доп. премия", `month_${month.month}_extra_bonus`),
+                        moneyColumn("Отпускные", `month_${month.month}_vacation`),
+                        moneyColumn("Больничные", `month_${month.month}_sick_leave`),
+                        moneyColumn("Командировочные", `month_${month.month}_business_trip`),
+                    ],
+                });
+            });
+
+            columns.push(moneyColumn("Среднее за период", "average_income"));
+            return columns;
+        }
+
+        function buildTable(rows, months) {
+            const columns = buildColumns(months);
+            if (table) {
+                table.setColumns(columns);
+                table.replaceData(rows);
+                return;
+            }
+
+            table = new Tabulator("#employee-report-table", {
+                data: rows,
+                index: "employee_id",
+                layout: "fitDataStretch",
+                height: "680px",
+                movableColumns: true,
+                columnDefaults: {
+                    headerSort: true,
+                    resizable: true,
+                },
+                columns,
+            });
+        }
+
+        async function loadGroups() {
+            try {
+                const response = await fetch("{% url 'employee-groups-data' %}");
+                const payload = await response.json();
+                if (!response.ok || payload.status !== "ok") {
+                    throw new Error(payload.message || "Не удалось загрузить группы сотрудников.");
+                }
+
+                groupFilter.innerHTML = "";
+                payload.groups.forEach((group) => {
+                    const label = document.createElement("label");
+                    label.className = "group-checkbox";
+
+                    const checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.value = group.id;
+                    checkbox.checked = group.name.trim() === "ТКЗ ИЦ СПБ";
+                    checkbox.addEventListener("change", () => {
+                        updateGroupsToggleText();
+                        resetVisibleTable();
+                    });
+
+                    const text = document.createElement("span");
+                    text.textContent = group.name;
+
+                    label.appendChild(checkbox);
+                    label.appendChild(text);
+                    groupFilter.appendChild(label);
+                });
+
+                if (payload.groups.length === 0) {
+                    groupFilter.innerHTML = '<span class="groups-placeholder">Группы не найдены</span>';
+                }
+                updateGroupsToggleText();
+            } catch (error) {
+                groupFilter.innerHTML = '<span class="groups-placeholder">Ошибка загрузки групп</span>';
+                updateGroupsToggleText();
+                showStatus(error.message, "error");
+            }
+        }
+
+        async function loadTable() {
+            clearStatus();
+            loadButton.disabled = true;
+            loadButton.textContent = "Загрузка...";
+
+            try {
+                const response = await fetch(`{% url 'employee-report-data' %}?${getReportParams()}`);
+                const payload = await response.json();
+                if (!response.ok || payload.status !== "ok") {
+                    throw new Error(payload.message || "Не удалось загрузить отчёт.");
+                }
+
+                tablePanel.classList.add("visible");
+                buildTable(payload.rows, payload.months);
+                showStatus("Отчёт по сотрудникам загружен.", "success");
+            } catch (error) {
+                showStatus(error.message, "error");
+            } finally {
+                loadButton.disabled = false;
+                loadButton.textContent = "Получить список пользователей";
+            }
+        }
+
+        groupsToggle.addEventListener("click", () => {
+            groupFilter.classList.toggle("visible");
+            groupsToggle.classList.toggle("open");
+        });
+        statusToggle.addEventListener("click", () => {
+            statusFilter.classList.toggle("visible");
+            statusToggle.classList.toggle("open");
+        });
+        statusFilter.querySelectorAll("input[name='active-status']").forEach((input) => {
+            input.addEventListener("change", () => {
+                updateStatusToggleText();
+                resetVisibleTable();
+            });
+        });
+        loadButton.addEventListener("click", loadTable);
+        yearSelect.addEventListener("change", resetVisibleTable);
+        quarterInputs.forEach((input) => input.addEventListener("change", resetVisibleTable));
+        updateStatusToggleText();
+        loadGroups();
+    </script>
+</body>
+</html>
