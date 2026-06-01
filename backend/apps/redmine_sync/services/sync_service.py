@@ -6,9 +6,10 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
-from apps.employees.models import Employee
+from apps.employees.models import Employee, EmployeeGroupMembership, RedmineGroup
 from apps.projects.models import Project
 from apps.redmine_sync.models import RedmineTimeEntry, SyncLog, SyncState
 
@@ -60,6 +61,8 @@ class SyncService:
 
         try:
             details["employees"] = self.sync_employees().as_dict()
+            details["groups"] = self.sync_groups().as_dict()
+            details["group_memberships"] = self.sync_group_memberships().as_dict()
             details["projects"] = self.sync_projects().as_dict()
             self.ensure_technical_employees()
             details["time_entries"] = self.sync_time_entries(
@@ -124,6 +127,108 @@ class SyncService:
         stats.created = len(employees_to_create)
         stats.updated = len(employees_to_update)
         self._mark_state("employees", "success", stats)
+        return stats
+
+    def sync_groups(self) -> SyncStats:
+        stats = SyncStats()
+        payload = self.reader.fetch_groups()
+        now = timezone.now()
+
+        redmine_group_ids = [item["redmine_group_id"] for item in payload]
+        existing_by_redmine_id = RedmineGroup.objects.in_bulk(
+            redmine_group_ids,
+            field_name="redmine_group_id",
+        )
+
+        groups_to_create: list[RedmineGroup] = []
+        groups_to_update: list[RedmineGroup] = []
+
+        for item in payload:
+            defaults = {
+                "name": item.get("name") or "",
+                "active": bool(item.get("active")),
+                "synced_at": now,
+            }
+            group = existing_by_redmine_id.get(item["redmine_group_id"])
+            if group is None:
+                groups_to_create.append(
+                    RedmineGroup(
+                        redmine_group_id=item["redmine_group_id"],
+                        **defaults,
+                    )
+                )
+                continue
+
+            if self._apply_changes(group, defaults):
+                groups_to_update.append(group)
+
+        with transaction.atomic():
+            if groups_to_create:
+                RedmineGroup.objects.bulk_create(groups_to_create, batch_size=500)
+            if groups_to_update:
+                RedmineGroup.objects.bulk_update(
+                    groups_to_update,
+                    ["name", "active", "synced_at"],
+                    batch_size=500,
+                )
+
+        stats.created = len(groups_to_create)
+        stats.updated = len(groups_to_update)
+        self._mark_state("groups", "success", stats)
+        return stats
+
+    def sync_group_memberships(self) -> SyncStats:
+        stats = SyncStats()
+        payload = self.reader.fetch_group_memberships()
+
+        redmine_group_ids = {item["redmine_group_id"] for item in payload}
+        redmine_user_ids = {item["redmine_user_id"] for item in payload}
+
+        group_map = (
+            RedmineGroup.objects.in_bulk(redmine_group_ids, field_name="redmine_group_id")
+            if redmine_group_ids
+            else {}
+        )
+        employee_map = (
+            Employee.objects.in_bulk(redmine_user_ids, field_name="redmine_id")
+            if redmine_user_ids
+            else {}
+        )
+
+        target_pairs: set[tuple[int, int]] = set()
+        for item in payload:
+            group = group_map.get(item["redmine_group_id"])
+            employee = employee_map.get(item["redmine_user_id"])
+            if group is None or employee is None:
+                stats.skipped += 1
+                continue
+            target_pairs.add((employee.id, group.id))
+
+        existing_pairs = set(
+            EmployeeGroupMembership.objects.values_list("employee_id", "group_id")
+        )
+        pairs_to_create = target_pairs - existing_pairs
+        pairs_to_delete = existing_pairs - target_pairs
+
+        with transaction.atomic():
+            if pairs_to_delete:
+                delete_query = Q()
+                for employee_id, group_id in pairs_to_delete:
+                    delete_query |= Q(employee_id=employee_id, group_id=group_id)
+                EmployeeGroupMembership.objects.filter(delete_query).delete()
+            if pairs_to_create:
+                EmployeeGroupMembership.objects.bulk_create(
+                    [
+                        EmployeeGroupMembership(employee_id=employee_id, group_id=group_id)
+                        for employee_id, group_id in pairs_to_create
+                    ],
+                    batch_size=1000,
+                    ignore_conflicts=True,
+                )
+
+        stats.created = len(pairs_to_create)
+        stats.updated = len(pairs_to_delete)
+        self._mark_state("group_memberships", "success", stats)
         return stats
 
     def sync_projects(self) -> SyncStats:

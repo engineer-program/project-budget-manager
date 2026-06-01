@@ -116,6 +116,33 @@ class RedmineReader:
         """
         return self._fetch_all(query)
 
+    def fetch_groups(self) -> list[dict[str, Any]]:
+        query = """
+        SELECT
+            u.id AS redmine_group_id,
+            u.lastname AS name,
+            (u.status = 1) AS active
+        FROM users u
+        WHERE u.type = 'Group'
+        ORDER BY u.lastname
+        """
+        return self._fetch_all(query)
+
+    def fetch_group_memberships(self) -> list[dict[str, Any]]:
+        query = """
+        SELECT
+            gu.group_id AS redmine_group_id,
+            gu.user_id AS redmine_user_id
+        FROM groups_users gu
+        INNER JOIN users g
+            ON g.id = gu.group_id
+           AND g.type = 'Group'
+        INNER JOIN users u
+            ON u.id = gu.user_id
+           AND u.type = 'User'
+        """
+        return self._fetch_all(query)
+
     def fetch_time_entries_chunk(
         self,
         *,
