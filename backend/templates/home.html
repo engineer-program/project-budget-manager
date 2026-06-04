@@ -5,6 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Основные страницы | Бюджетирование проектов ТКЗ</title>
+    <link rel="icon" href="{% static 'images/company_logo.ico' %}" type="image/x-icon">
     <style>
         :root {
             --bg-top: #f5efe5;
@@ -153,6 +154,136 @@
             line-height: 1.35;
         }
 
+        .menu-card.button-card {
+            border: 1px solid var(--panel-border);
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(26, 38, 48, 0.34);
+            z-index: 20;
+        }
+
+        .modal-backdrop.visible {
+            display: flex;
+        }
+
+        .modal {
+            width: min(640px, 100%);
+            background: #fff;
+            border-radius: 22px;
+            box-shadow: 0 30px 80px rgba(20, 30, 38, 0.28);
+            padding: 26px;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .modal-title {
+            margin: 0;
+            font-size: 1.35rem;
+        }
+
+        .close-button {
+            border: 0;
+            background: transparent;
+            font-size: 1.6rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .sync-actions {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .sync-button,
+        .ok-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 0.98rem;
+            font-weight: 700;
+            color: #fff;
+            background: var(--accent);
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .sync-button:hover,
+        .ok-button:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        .sync-button.danger {
+            border-color: #c54b4b;
+            background: #c54b4b;
+        }
+
+        .sync-button.danger:hover {
+            border-color: #a83d3d;
+            background: #a83d3d;
+        }
+
+        .sync-button:disabled {
+            opacity: 0.65;
+            cursor: wait;
+        }
+
+        .sync-status {
+            min-height: 48px;
+            border-radius: 14px;
+            padding: 12px 14px;
+            color: var(--text-muted);
+            background: rgba(75, 167, 233, 0.08);
+        }
+
+        .sync-status.success {
+            color: #22643e;
+            background: #e9f7ef;
+        }
+
+        .sync-status.error {
+            color: #9c2f2f;
+            background: #fbeaea;
+        }
+
+        .sync-last-time {
+            margin-top: 12px;
+            color: var(--text-muted);
+            font-size: 0.92rem;
+            line-height: 1.45;
+        }
+
+        .ok-button {
+            display: none;
+            margin-top: 14px;
+            min-width: 100px;
+        }
+
+        .ok-button.visible {
+            display: inline-flex;
+        }
+
         @media (max-width: 640px) {
             .page {
                 padding: 20px 16px 32px;
@@ -204,7 +335,169 @@
                     <span>{{ page.title }}</span>
                 </a>
             {% endfor %}
+            <button class="menu-card button-card" type="button" id="open-sync-modal">
+                <span>Синхронизация данных</span>
+            </button>
         </section>
     </div>
+
+    <div id="sync-modal-backdrop" class="modal-backdrop">
+        <section class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Синхронизация данных</h2>
+                <button class="close-button" type="button" id="close-sync-modal">&times;</button>
+            </div>
+            <div class="sync-actions">
+                <button class="sync-button" type="button" id="run-window-sync">
+                    Синхронизировать данные из Redmine
+                </button>
+                {% if request.user.is_superuser or request.user.is_staff %}
+                    <button class="sync-button danger" type="button" id="run-full-sync">
+                        Полная синхронизация данных из Redmine
+                    </button>
+                {% endif %}
+            </div>
+            <div id="sync-status" class="sync-status">
+                Выберите режим синхронизации
+            </div>
+            <div id="sync-last-time" class="sync-last-time">
+                Последняя синхронизация данных из Redmine: загрузка...
+            </div>
+            <button class="ok-button" type="button" id="sync-ok-button">Ок</button>
+        </section>
+    </div>
+
+    <script>
+        const syncModal = document.getElementById("sync-modal-backdrop");
+        const syncStatus = document.getElementById("sync-status");
+        const syncLastTime = document.getElementById("sync-last-time");
+        const syncOkButton = document.getElementById("sync-ok-button");
+        const syncButtons = Array.from(document.querySelectorAll(".sync-button"));
+
+        function getCsrfToken() {
+            const cookie = document.cookie.split("; ").find((item) => item.startsWith("csrftoken="));
+            return cookie ? decodeURIComponent(cookie.split("=")[1]) : "";
+        }
+
+        function openSyncModal() {
+            syncStatus.className = "sync-status";
+            syncStatus.textContent = "Выберите режим синхронизации";
+            syncOkButton.classList.remove("visible");
+            syncModal.classList.add("visible");
+            loadSyncStatus();
+        }
+
+        function closeSyncModal() {
+            syncModal.classList.remove("visible");
+        }
+
+        function setSyncButtonsDisabled(disabled) {
+            syncButtons.forEach((button) => {
+                button.disabled = disabled;
+            });
+        }
+
+        function formatSyncDate(value) {
+            if (!value) {
+                return null;
+            }
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) {
+                return null;
+            }
+            return date.toLocaleString("ru-RU", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+            });
+        }
+
+        async function loadSyncStatus() {
+            syncLastTime.textContent = "Последняя синхронизация данных из Redmine: загрузка...";
+            try {
+                const response = await fetch("{% url 'redmine_sync:status' %}");
+                const payload = await response.json();
+                if (!response.ok || payload.status !== "ok") {
+                    throw new Error("Не удалось получить статус синхронизации.");
+                }
+
+                const states = [
+                    payload.employees,
+                    payload.projects,
+                    payload.time_entries_incremental,
+                    payload.time_entries_window,
+                    payload.time_entries_full,
+                ].filter(Boolean);
+                const lastSuccessValues = states
+                    .map((state) => state.last_success_at)
+                    .filter(Boolean)
+                    .map((value) => new Date(value))
+                    .filter((date) => !Number.isNaN(date.getTime()));
+
+                if (lastSuccessValues.length === 0) {
+                    syncLastTime.textContent = "Последняя синхронизация данных из Redmine: пока не выполнялась.";
+                    return;
+                }
+
+                const latest = new Date(Math.max(...lastSuccessValues.map((date) => date.getTime())));
+                syncLastTime.textContent = `Последняя синхронизация данных из Redmine: ${formatSyncDate(latest)}.`;
+            } catch (error) {
+                syncLastTime.textContent = "Последняя синхронизация данных из Redmine: не удалось получить статус.";
+            }
+        }
+
+        async function runSync(url, runningMessage, successMessage) {
+            setSyncButtonsDisabled(true);
+            syncOkButton.classList.remove("visible");
+            syncStatus.className = "sync-status";
+            syncStatus.textContent = runningMessage;
+
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: {"X-CSRFToken": getCsrfToken()},
+                });
+                const payload = await response.json();
+                if (!response.ok || payload.status !== "ok") {
+                    throw new Error(payload.message || "Синхронизация завершилась с ошибкой.");
+                }
+                syncStatus.className = "sync-status success";
+                syncStatus.textContent = successMessage;
+                await loadSyncStatus();
+                syncOkButton.classList.add("visible");
+            } catch (error) {
+                syncStatus.className = "sync-status error";
+                syncStatus.textContent = error.message;
+                syncOkButton.classList.add("visible");
+            } finally {
+                setSyncButtonsDisabled(false);
+            }
+        }
+
+        document.getElementById("open-sync-modal").addEventListener("click", openSyncModal);
+        document.getElementById("close-sync-modal").addEventListener("click", closeSyncModal);
+        syncOkButton.addEventListener("click", closeSyncModal);
+        document.getElementById("run-window-sync").addEventListener("click", () => {
+            runSync(
+                "{% url 'redmine_sync:window' %}",
+                "Выполняется синхронизация данных из Redmine за последние 365 дней...",
+                "Синхронизация данных из Redmine успешно завершена."
+            );
+        });
+
+        const fullSyncButton = document.getElementById("run-full-sync");
+        if (fullSyncButton) {
+            fullSyncButton.addEventListener("click", () => {
+                runSync(
+                    "{% url 'redmine_sync:full' %}",
+                    "Выполняется полная синхронизация данных из Redmine. Это может занять несколько минут...",
+                    "Полная синхронизация данных из Redmine успешно завершена."
+                );
+            });
+        }
+    </script>
 </body>
 </html>

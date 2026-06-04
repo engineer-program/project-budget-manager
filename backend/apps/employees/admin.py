@@ -6,8 +6,10 @@ from .models import (
     Employee,
     EmployeeBonus,
     EmployeeCompensation,
+    EmployeeGroupMembership,
     EmployeeSalary,
     EmployeeUserBinding,
+    RedmineGroup,
 )
 
 User = get_user_model()
@@ -36,9 +38,26 @@ class EmployeeUserBindingAdmin(admin.ModelAdmin):
 
 
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ("last_name", "first_name", "patronymic", "email", "active", "redmine_id")
-    search_fields = ("last_name", "first_name", "patronymic", "email", "redmine_id")
+    list_display = ("last_name", "first_name", "patronymic", "position", "email", "active", "redmine_id")
+    search_fields = ("last_name", "first_name", "patronymic", "position", "email", "redmine_id")
     list_filter = ("active",)
+
+
+class RedmineGroupAdmin(admin.ModelAdmin):
+    list_display = ("name", "active", "redmine_group_id", "synced_at")
+    search_fields = ("name", "redmine_group_id")
+    list_filter = ("active",)
+
+
+class EmployeeGroupMembershipAdmin(admin.ModelAdmin):
+    list_display = ("employee", "group")
+    search_fields = (
+        "employee__last_name",
+        "employee__first_name",
+        "employee__patronymic",
+        "group__name",
+    )
+    autocomplete_fields = ["employee", "group"]
 
 
 class EmployeeSalaryAdmin(admin.ModelAdmin):
@@ -92,3 +111,5 @@ admin.site.register(EmployeeSalary, EmployeeSalaryAdmin)
 admin.site.register(EmployeeBonus, EmployeeBonusAdmin)
 admin.site.register(EmployeeCompensation, EmployeeCompensationAdmin)
 admin.site.register(EmployeeUserBinding, EmployeeUserBindingAdmin)
+admin.site.register(RedmineGroup, RedmineGroupAdmin)
+admin.site.register(EmployeeGroupMembership, EmployeeGroupMembershipAdmin)

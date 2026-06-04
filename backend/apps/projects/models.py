@@ -11,6 +11,9 @@ class Project(TimestampedModel):
     name_sanda = models.CharField(max_length=255, blank=True)
     project_number = models.CharField(max_length=100, blank=True, db_index=True)
     lead_department = models.CharField(max_length=255, blank=True)
+    redmine_created_on = models.DateTimeField(null=True, blank=True)
+    redmine_updated_on = models.DateTimeField(null=True, blank=True)
+    synced_at = models.DateTimeField(null=True, blank=True)
     parent_project = models.ForeignKey(
         "self",
         on_delete=models.PROTECT,

@@ -65,6 +65,7 @@ class ProjectIncome(models.Model):
         related_name="incomes",
         db_column="project_id",
     )
+    article = models.CharField(max_length=255, blank=True)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
     responsible_employee = models.ForeignKey(
         "employees.Employee",
@@ -92,4 +93,3 @@ class ProjectIncome(models.Model):
             models.Index(fields=["responsible_employee"], name="idx_inc_resp_employee"),
             models.Index(fields=["created_by"], name="idx_inc_created_by"),
         ]
-

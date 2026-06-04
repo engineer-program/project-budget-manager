@@ -17,7 +17,10 @@ class RedmineReader:
             u.id AS redmine_id,
             u.firstname AS first_name,
             u.lastname AS last_name,
-            cv.value AS patronymic,
+            cv_patr.value AS patronymic,
+            cv_pos.value AS position,
+            cv_employment.value AS employment_date,
+            cv_dismissal.value AS dismissal_date,
             COALESCE(ea.address, '') AS email,
             (u.status = 1) AS active
         FROM users u
@@ -26,14 +29,41 @@ class RedmineReader:
             ON ea.user_id = u.id
            AND ea.is_default = 1
 
-        LEFT JOIN custom_fields cf
-            ON cf.type = 'UserCustomField'
-           AND cf.name = 'Отчество'
+        LEFT JOIN custom_fields cf_patr
+            ON cf_patr.type = 'UserCustomField'
+        AND cf_patr.name = 'Отчество'
 
-        LEFT JOIN custom_values cv
-            ON cv.custom_field_id = cf.id
-           AND cv.customized_id = u.id
-           AND cv.customized_type = 'Principal'
+        LEFT JOIN custom_values cv_patr
+            ON cv_patr.custom_field_id = cf_patr.id
+        AND cv_patr.customized_id = u.id
+        AND cv_patr.customized_type = 'Principal'
+
+        LEFT JOIN custom_fields cf_pos
+            ON cf_pos.type = 'UserCustomField'
+        AND cf_pos.name = 'Должность'
+
+        LEFT JOIN custom_values cv_pos
+            ON cv_pos.custom_field_id = cf_pos.id
+        AND cv_pos.customized_id = u.id
+        AND cv_pos.customized_type = 'Principal'
+
+        LEFT JOIN custom_fields cf_employment
+            ON cf_employment.type = 'UserCustomField'
+        AND cf_employment.name = 'Дата трудоустройства'
+
+        LEFT JOIN custom_values cv_employment
+            ON cv_employment.custom_field_id = cf_employment.id
+        AND cv_employment.customized_id = u.id
+        AND cv_employment.customized_type = 'Principal'
+
+        LEFT JOIN custom_fields cf_dismissal
+            ON cf_dismissal.type = 'UserCustomField'
+        AND cf_dismissal.name = 'Дата увольнения'
+
+        LEFT JOIN custom_values cv_dismissal
+            ON cv_dismissal.custom_field_id = cf_dismissal.id
+        AND cv_dismissal.customized_id = u.id
+        AND cv_dismissal.customized_type = 'Principal'
 
         WHERE u.type = 'User'
 
@@ -46,13 +76,24 @@ class RedmineReader:
         SELECT
             p.id AS redmine_project_id,
             p.name,
-            p.identifier AS project_number,
+            cv_number.value AS project_number,
             p.parent_id AS parent_redmine_project_id,
+            p.created_on AS redmine_created_on,
+            p.updated_on AS redmine_updated_on,
             cv_1s.value AS name_1s,
             cv_sanda.value AS name_sanda,
             cv_dep.value AS lead_department,
             cv_manag.value AS redmine_project_manager_id
         FROM projects p
+
+        LEFT JOIN custom_fields cf_number
+            ON cf_number.type = 'ProjectCustomField'
+           AND cf_number.name = 'Номер проекта'
+
+        LEFT JOIN custom_values cv_number
+            ON cv_number.custom_field_id = cf_number.id
+           AND cv_number.customized_id = p.id
+           AND cv_number.customized_type = 'Project'
 
         LEFT JOIN custom_fields cf_1s
             ON cf_1s.type = 'ProjectCustomField'
@@ -91,6 +132,34 @@ class RedmineReader:
            AND cv_manag.customized_type = 'Project'
 
         WHERE p.status IN (1, 5, 9, 15)
+          AND COALESCE(p.easy_is_easy_template, 0) = 0
+        """
+        return self._fetch_all(query)
+
+    def fetch_groups(self) -> list[dict[str, Any]]:
+        query = """
+        SELECT
+            u.id AS redmine_group_id,
+            u.lastname AS name,
+            (u.status = 1) AS active
+        FROM users u
+        WHERE u.type = 'Group'
+        ORDER BY u.lastname
+        """
+        return self._fetch_all(query)
+
+    def fetch_group_memberships(self) -> list[dict[str, Any]]:
+        query = """
+        SELECT
+            gu.group_id AS redmine_group_id,
+            gu.user_id AS redmine_user_id
+        FROM groups_users gu
+        INNER JOIN users g
+            ON g.id = gu.group_id
+           AND g.type = 'Group'
+        INNER JOIN users u
+            ON u.id = gu.user_id
+           AND u.type = 'User'
         """
         return self._fetch_all(query)
 

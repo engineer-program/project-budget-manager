@@ -1,4 +1,4 @@
-from django.conf import settings
+﻿from django.conf import settings
 from django.db import models
 from django.db.models import Q
 
@@ -10,6 +10,9 @@ class Employee(models.Model):
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
     patronymic = models.CharField(max_length=255, blank=True)
+    position = models.CharField(max_length=255, blank=True)
+    employment_date = models.DateField(null=True, blank=True)
+    dismissal_date = models.DateField(null=True, blank=True)
     email = models.EmailField(max_length=255, blank=True, db_index=True)
     active = models.BooleanField(default=True, db_index=True)
 
@@ -20,6 +23,45 @@ class Employee(models.Model):
     def __str__(self):
         parts = [self.last_name, self.first_name, self.patronymic]
         return " ".join(part for part in parts if part).strip()
+
+
+class RedmineGroup(models.Model):
+    redmine_group_id = models.IntegerField(unique=True, db_index=True)
+    name = models.CharField(max_length=255)
+    active = models.BooleanField(default=True, db_index=True)
+    synced_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "redmine_groups"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class EmployeeGroupMembership(models.Model):
+    employee = models.ForeignKey(
+        "employees.Employee",
+        on_delete=models.CASCADE,
+        related_name="group_memberships",
+        db_column="employee_id",
+    )
+    group = models.ForeignKey(
+        "employees.RedmineGroup",
+        on_delete=models.CASCADE,
+        related_name="employee_memberships",
+        db_column="group_id",
+    )
+
+    class Meta:
+        db_table = "employee_group_memberships"
+        ordering = ["group_id", "employee_id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "group"],
+                name="uniq_employee_group_membership",
+            ),
+        ]
 
 
 class EmployeeUserBinding(TimestampedModel):
