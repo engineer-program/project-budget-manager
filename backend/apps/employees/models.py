@@ -11,6 +11,8 @@ class Employee(models.Model):
     last_name = models.CharField(max_length=255)
     patronymic = models.CharField(max_length=255, blank=True)
     position = models.CharField(max_length=255, blank=True)
+    employment_date = models.DateField(null=True, blank=True)
+    dismissal_date = models.DateField(null=True, blank=True)
     email = models.EmailField(max_length=255, blank=True, db_index=True)
     active = models.BooleanField(default=True, db_index=True)
 

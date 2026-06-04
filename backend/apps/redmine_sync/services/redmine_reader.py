@@ -19,6 +19,8 @@ class RedmineReader:
             u.lastname AS last_name,
             cv_patr.value AS patronymic,
             cv_pos.value AS position,
+            cv_employment.value AS employment_date,
+            cv_dismissal.value AS dismissal_date,
             COALESCE(ea.address, '') AS email,
             (u.status = 1) AS active
         FROM users u
@@ -44,6 +46,24 @@ class RedmineReader:
             ON cv_pos.custom_field_id = cf_pos.id
         AND cv_pos.customized_id = u.id
         AND cv_pos.customized_type = 'Principal'
+
+        LEFT JOIN custom_fields cf_employment
+            ON cf_employment.type = 'UserCustomField'
+        AND cf_employment.name = 'Дата трудоустройства'
+
+        LEFT JOIN custom_values cv_employment
+            ON cv_employment.custom_field_id = cf_employment.id
+        AND cv_employment.customized_id = u.id
+        AND cv_employment.customized_type = 'Principal'
+
+        LEFT JOIN custom_fields cf_dismissal
+            ON cf_dismissal.type = 'UserCustomField'
+        AND cf_dismissal.name = 'Дата увольнения'
+
+        LEFT JOIN custom_values cv_dismissal
+            ON cv_dismissal.custom_field_id = cf_dismissal.id
+        AND cv_dismissal.customized_id = u.id
+        AND cv_dismissal.customized_type = 'Principal'
 
         WHERE u.type = 'User'
 

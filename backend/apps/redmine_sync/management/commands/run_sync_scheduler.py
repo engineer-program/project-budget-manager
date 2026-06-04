@@ -35,7 +35,8 @@ class Command(BaseCommand):
         )
 
         while True:
-            now = timezone.localtime()
+            current_time = timezone.now()
+            now = timezone.localtime(current_time) if timezone.is_aware(current_time) else current_time
 
             if self._should_run_window(now, last_window_run_date):
                 self.stdout.write(

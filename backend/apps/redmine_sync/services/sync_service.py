@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -98,6 +99,8 @@ class SyncService:
                 "last_name": item["last_name"] or "",
                 "patronymic": item.get("patronymic") or "",
                 "position": item.get("position") or "",
+                "employment_date": self._normalize_date(item.get("employment_date")),
+                "dismissal_date": self._normalize_date(item.get("dismissal_date")),
                 "email": item.get("email") or "",
                 "active": bool(item.get("active")),
             }
@@ -120,7 +123,16 @@ class SyncService:
             if employees_to_update:
                 Employee.objects.bulk_update(
                     employees_to_update,
-                    ["first_name", "last_name", "patronymic", "position", "email", "active"],
+                    [
+                        "first_name",
+                        "last_name",
+                        "patronymic",
+                        "position",
+                        "employment_date",
+                        "dismissal_date",
+                        "email",
+                        "active",
+                    ],
                     batch_size=500,
                 )
 
@@ -509,6 +521,8 @@ class SyncService:
                 "last_name": "пользователь",
                 "patronymic": "",
                 "position": "",
+                "employment_date": None,
+                "dismissal_date": None,
                 "email": "",
                 "active": False,
             },
@@ -565,9 +579,30 @@ class SyncService:
     def _normalize_datetime(self, value: datetime | None) -> datetime:
         if value is None:
             return timezone.now()
-        if timezone.is_naive(value):
+        if settings.USE_TZ and timezone.is_naive(value):
             return timezone.make_aware(value, timezone.get_current_timezone())
+        if not settings.USE_TZ and timezone.is_aware(value):
+            return timezone.make_naive(value, timezone.get_current_timezone())
         return value
+
+    def _normalize_date(self, value: object) -> date | None:
+        if value in (None, ""):
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+
+        text_value = str(value).strip()
+        if not text_value:
+            return None
+
+        for date_format in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(text_value, date_format).date()
+            except ValueError:
+                continue
+        return None
 
     def _safe_int(self, value: object) -> int | None:
         if value in (None, ""):

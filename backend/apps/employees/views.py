@@ -11,6 +11,8 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
+from apps.audit.models import ChangeLog
+from apps.audit.services import log_change, serialize_instance
 from apps.reference.models import CompensationType
 
 from .forms import EmployeeSalaryPeriodForm, YEAR_CHOICES
@@ -273,8 +275,34 @@ def _build_employee_report_rows(
     return rows, report_months
 
 
+def _save_with_audit(instance, user, update_fields: list[str], before_data: dict[str, Any]) -> None:
+    audited_fields = [field for field in update_fields if field != "updated_at"]
+    after_data = serialize_instance(instance, audited_fields)
+    if before_data == after_data:
+        return
+
+    instance.save(update_fields=update_fields)
+    log_change(
+        user=user,
+        entity=instance,
+        action=ChangeLog.ACTION_UPDATE,
+        before_data=before_data,
+        after_data=after_data,
+    )
+
+
+def _log_created(instance, user) -> None:
+    log_change(
+        user=user,
+        entity=instance,
+        action=ChangeLog.ACTION_CREATE,
+        before_data=None,
+        after_data=serialize_instance(instance),
+    )
+
+
 @transaction.atomic
-def _save_employee_salary_rows(year: int, month: int, rows: list[dict[str, Any]]) -> int:
+def _save_employee_salary_rows(year: int, month: int, rows: list[dict[str, Any]], user) -> int:
     if not rows:
         return 0
 
@@ -293,15 +321,19 @@ def _save_employee_salary_rows(year: int, month: int, rows: list[dict[str, Any]]
         if employee_id not in existing_employee_ids:
             continue
 
-        EmployeeSalary.objects.update_or_create(
+        salary, created = EmployeeSalary.objects.get_or_create(
             employee_id=employee_id,
             year=year,
             month=month,
-            defaults={
-                "base_salary": _parse_amount(row.get("base_salary")),
-                "extra_salary": _parse_amount(row.get("extra_salary")),
-            },
         )
+        salary_before = serialize_instance(salary, ["base_salary", "extra_salary"]) if not created else None
+        salary.base_salary = _parse_amount(row.get("base_salary"))
+        salary.extra_salary = _parse_amount(row.get("extra_salary"))
+        if created:
+            salary.save()
+            _log_created(salary, user)
+        else:
+            _save_with_audit(salary, user, ["base_salary", "extra_salary", "updated_at"], salary_before)
 
         bonus_year = _parse_year(row.get("bonus_year")) or year
         try:
@@ -321,27 +353,71 @@ def _save_employee_salary_rows(year: int, month: int, rows: list[dict[str, Any]]
         }
         bonus_id = row.get("bonus_id")
         if bonus_id:
-            EmployeeBonus.objects.filter(id=bonus_id, employee_id=employee_id).update(**bonus_defaults)
+            bonus = EmployeeBonus.objects.filter(id=bonus_id, employee_id=employee_id).first()
+            if bonus is not None:
+                bonus_before = serialize_instance(
+                    bonus,
+                    ["year", "month", "bonus", "extra_bonus", "bonus_year", "bonus_quarter"],
+                )
+                for field_name, value in bonus_defaults.items():
+                    setattr(bonus, field_name, value)
+                _save_with_audit(
+                    bonus,
+                    user,
+                    ["year", "month", "bonus", "extra_bonus", "bonus_year", "bonus_quarter", "updated_at"],
+                    bonus_before,
+                )
+            else:
+                bonus, created = EmployeeBonus.objects.update_or_create(
+                    employee_id=employee_id,
+                    bonus_year=bonus_year,
+                    bonus_quarter=bonus_quarter,
+                    defaults=bonus_defaults,
+                )
+                if created:
+                    _log_created(bonus, user)
         else:
-            EmployeeBonus.objects.update_or_create(
+            bonus, created = EmployeeBonus.objects.get_or_create(
                 employee_id=employee_id,
                 bonus_year=bonus_year,
                 bonus_quarter=bonus_quarter,
-                defaults=bonus_defaults,
             )
+            bonus_before = (
+                serialize_instance(bonus, ["year", "month", "bonus", "extra_bonus", "bonus_year", "bonus_quarter"])
+                if not created
+                else None
+            )
+            for field_name, value in bonus_defaults.items():
+                setattr(bonus, field_name, value)
+            if created:
+                bonus.save()
+                _log_created(bonus, user)
+            else:
+                _save_with_audit(
+                    bonus,
+                    user,
+                    ["year", "month", "bonus", "extra_bonus", "bonus_year", "bonus_quarter", "updated_at"],
+                    bonus_before,
+                )
 
         for code in COMPENSATION_CODES:
             compensation_type = compensation_types.get(code)
             if compensation_type is None:
                 continue
 
-            EmployeeCompensation.objects.update_or_create(
+            compensation, created = EmployeeCompensation.objects.get_or_create(
                 employee_id=employee_id,
                 year=year,
                 month=month,
                 type=compensation_type,
-                defaults={"amount": _parse_amount(row.get(code))},
             )
+            compensation_before = serialize_instance(compensation, ["amount"]) if not created else None
+            compensation.amount = _parse_amount(row.get(code))
+            if created:
+                compensation.save()
+                _log_created(compensation, user)
+            else:
+                _save_with_audit(compensation, user, ["amount", "updated_at"], compensation_before)
 
         saved += 1
 
@@ -500,6 +576,59 @@ def employee_bonus_conflict_view(request: HttpRequest) -> JsonResponse:
 
 @login_required
 @require_POST
+def employee_bonus_delete_view(request: HttpRequest) -> JsonResponse:
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse(
+            {"status": "error", "message": "Некорректный JSON."},
+            status=400,
+        )
+
+    try:
+        bonus_id = int(payload.get("bonus_id") or 0)
+    except (TypeError, ValueError):
+        return JsonResponse(
+            {"status": "error", "message": "Некорректная запись премии."},
+            status=400,
+        )
+    field = payload.get("field")
+    if field not in {"bonus", "extra_bonus"}:
+        return JsonResponse(
+            {"status": "error", "message": "Некорректный тип премии."},
+            status=400,
+        )
+
+    bonus = EmployeeBonus.objects.filter(id=bonus_id).first()
+    if bonus is None:
+        return JsonResponse({"status": "ok"})
+
+    before_data = serialize_instance(bonus)
+    setattr(bonus, field, ZERO)
+    if bonus.bonus == ZERO and bonus.extra_bonus == ZERO:
+        log_change(
+            user=request.user,
+            entity=bonus,
+            action=ChangeLog.ACTION_DELETE,
+            before_data=before_data,
+            after_data=None,
+        )
+        bonus.delete()
+        return JsonResponse({"status": "ok", "deleted_record": True})
+
+    bonus.save(update_fields=[field, "updated_at"])
+    log_change(
+        user=request.user,
+        entity=bonus,
+        action=ChangeLog.ACTION_UPDATE,
+        before_data=before_data,
+        after_data=serialize_instance(bonus),
+    )
+    return JsonResponse({"status": "ok", "deleted_record": False})
+
+
+@login_required
+@require_POST
 def employee_salaries_bulk_save_view(request: HttpRequest) -> JsonResponse:
     try:
         payload = json.loads(request.body.decode("utf-8"))
@@ -517,5 +646,5 @@ def employee_salaries_bulk_save_view(request: HttpRequest) -> JsonResponse:
             status=400,
         )
 
-    saved = _save_employee_salary_rows(year, month, rows)
+    saved = _save_employee_salary_rows(year, month, rows, request.user)
     return JsonResponse({"status": "ok", "saved": saved})
