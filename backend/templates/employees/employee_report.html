@@ -5,6 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Отчёт по сотрудникам | Бюджетирование проектов ТКЗ</title>
+    <link rel="icon" href="{% static 'images/company_logo.ico' %}" type="image/x-icon">
     <link rel="stylesheet" href="{% static 'vendor/tabulator/tabulator.min.css' %}">
     <style>
         :root {
@@ -452,13 +453,14 @@
                 hozAlign: "right",
                 sorter: "number",
                 formatter: (cell) => formatMoney(cell.getValue()),
+                minWidth: 100
             };
         }
 
         function buildColumns(months) {
             const columns = [
                 {title: "ФИО сотрудника", field: "full_name", frozen: true, width: 280, headerFilter: "input"},
-                {title: "Должность", field: "position", frozen: true, width: 220, headerFilter: "input"},
+                {title: "Должность", field: "position", frozen: true, width: 80, headerFilter: "input"},
             ];
 
             months.forEach((month) => {
@@ -468,7 +470,7 @@
                     columns: [
                         moneyColumn("З/П", `month_${month.month}_base_salary`),
                         moneyColumn("Доп. З/П", `month_${month.month}_extra_salary`),
-                        moneyColumn("Квартальная премия", `month_${month.month}_bonus`),
+                        moneyColumn("Премия кв.", `month_${month.month}_bonus`),
                         moneyColumn("Доп. премия", `month_${month.month}_extra_bonus`),
                         moneyColumn("Отпускные", `month_${month.month}_vacation`),
                         moneyColumn("Больничные", `month_${month.month}_sick_leave`),

@@ -5,6 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>З/П сотрудников | Бюджетирование проектов ТКЗ</title>
+    <link rel="icon" href="{% static 'images/company_logo.ico' %}" type="image/x-icon">
     <link rel="stylesheet" href="{% static 'vendor/tabulator/tabulator.min.css' %}">
     <style>
         :root {
@@ -111,6 +112,12 @@
             border-color: var(--accent);
         }
 
+        .button.danger {
+            color: #fff;
+            background: #c54b4b;
+            border-color: #c54b4b;
+        }
+
         .back-link {
             margin-left: 64px;
         }
@@ -126,6 +133,15 @@
         .button.primary:hover {
             background: var(--accent-hover);
             border-color: var(--accent-hover);
+        }
+
+        .button.danger:hover {
+            background: #a83d3d;
+            border-color: #a83d3d;
+        }
+
+        .button.hidden {
+            display: none;
         }
 
         .button:disabled {
@@ -316,6 +332,16 @@
 
         .tabulator .tabulator-cell.dirty-cell {
             background: #fff4cf;
+        }
+
+        .tabulator .tabulator-cell.tabulator-frozen,
+        .tabulator .tabulator-col.tabulator-frozen {
+            background: #fff;
+            box-shadow: 1px 0 0 rgba(33, 49, 61, 0.12);
+        }
+
+        .tabulator .tabulator-row-even .tabulator-cell.tabulator-frozen {
+            background: #f8fbfd;
         }
 
         .bonus-cell {
@@ -540,6 +566,7 @@
                 </div>
                 <div class="modal-actions">
                     <button id="save-bonus-modal" class="button primary" type="button">Сохранить</button>
+                    <button id="delete-bonus-modal" class="button danger" type="button">Удалить</button>
                     <button id="cancel-bonus-modal" class="button" type="button">Отмена</button>
                 </div>
             </div>
@@ -556,6 +583,20 @@
             <div class="modal-actions">
                 <button id="confirm-bonus-conflict" class="button primary" type="button">Да</button>
                 <button id="cancel-bonus-conflict" class="button" type="button">Нет</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="bonus-delete-backdrop" class="modal-backdrop">
+        <section class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Удаление премии</h2>
+                <button id="close-bonus-delete" class="close-button" type="button">&times;</button>
+            </div>
+            <p>Вы уверены, что хотите удалить запись?</p>
+            <div class="modal-actions">
+                <button id="confirm-bonus-delete" class="button primary" type="button">Да</button>
+                <button id="cancel-bonus-delete" class="button" type="button">Нет</button>
             </div>
         </section>
     </div>
@@ -579,8 +620,10 @@
         const bonusAmountInput = document.getElementById("bonus-amount");
         const bonusQuarterSelect = document.getElementById("bonus-quarter");
         const bonusYearSelect = document.getElementById("bonus-year");
+        const deleteBonusButton = document.getElementById("delete-bonus-modal");
         const bonusConflictBackdrop = document.getElementById("bonus-conflict-backdrop");
         const bonusConflictMessage = document.getElementById("bonus-conflict-message");
+        const bonusDeleteBackdrop = document.getElementById("bonus-delete-backdrop");
         const dirtyRows = new Map();
         let table = null;
         let bonusModalContext = null;
@@ -649,7 +692,7 @@
         function formatBonusCell(cell) {
             const value = normalizeMoney(cell.getValue());
             const rowData = cell.getRow().getData();
-            const hasPeriod = Number(value) !== 0 || rowData.bonus_id;
+            const hasPeriod = Number(value) !== 0;
             const period = hasPeriod
                 ? ` <span class="bonus-period">(${quarterTitle(rowData.bonus_quarter)} кв. ${rowData.bonus_year})</span>`
                 : "";
@@ -692,6 +735,7 @@
             mutatorEdit: normalizeMoney,
             formatter: (cell) => formatMoney(cell.getValue()),
             cellEdited: markRowDirty,
+            minWidth: 100
         });
 
         const bonusColumn = (title, field) => ({
@@ -712,6 +756,8 @@
             bonusAmountInput.value = normalizeMoney(rowData[field]);
             bonusQuarterSelect.value = rowData.bonus_quarter || String(Math.floor((Number(monthSelect.value) - 1) / 3) + 1);
             bonusYearSelect.value = rowData.bonus_year || yearSelect.value;
+            const canDelete = Boolean(rowData.bonus_id) && Number(normalizeMoney(rowData[field])) !== 0;
+            deleteBonusButton.classList.toggle("hidden", !canDelete);
             bonusModalBackdrop.classList.add("visible");
         }
 
@@ -756,6 +802,65 @@
         function closeBonusConflict() {
             pendingBonusUpdates = null;
             bonusConflictBackdrop.classList.remove("visible");
+        }
+
+        function openBonusDeleteConfirm() {
+            if (!bonusModalContext) {
+                return;
+            }
+            bonusDeleteBackdrop.classList.add("visible");
+        }
+
+        function closeBonusDeleteConfirm() {
+            bonusDeleteBackdrop.classList.remove("visible");
+        }
+
+        async function deleteBonusRecord() {
+            if (!bonusModalContext) {
+                return;
+            }
+
+            const rowData = bonusModalContext.row.getData();
+            if (!rowData.bonus_id) {
+                return;
+            }
+
+            try {
+                const response = await fetch("{% url 'employee-bonus-delete' %}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": getCsrfToken(),
+                    },
+                    body: JSON.stringify({
+                        bonus_id: rowData.bonus_id,
+                        field: bonusModalContext.field,
+                    }),
+                });
+                const payload = await response.json();
+                if (!response.ok || payload.status !== "ok") {
+                    throw new Error(payload.message || "Не удалось удалить премию.");
+                }
+
+                const updates = {
+                    [bonusModalContext.field]: "0.00",
+                };
+                if (payload.deleted_record) {
+                    updates.bonus_id = null;
+                    updates.bonus = "0.00";
+                    updates.extra_bonus = "0.00";
+                    updates.bonus_year = Number(yearSelect.value);
+                    updates.bonus_quarter = Math.floor((Number(monthSelect.value) - 1) / 3) + 1;
+                }
+                await bonusModalContext.row.update(updates);
+                dirtyRows.delete(rowData.employee_id);
+                updateDirtyCounter();
+                closeBonusDeleteConfirm();
+                closeBonusModal();
+                showStatus("Запись премии удалена.", "success");
+            } catch (error) {
+                showStatus(error.message, "error");
+            }
         }
 
         async function saveBonusModal() {
@@ -818,10 +923,10 @@
                 },
                 columns: [
                     {title: "ФИО сотрудника", field: "full_name", frozen: true, width: 280, headerFilter: "input"},
-                    {title: "Должность", field: "position", width: 220, headerFilter: "input"},
-                    moneyColumn("Номинальная З/П", "base_salary"),
+                    {title: "Должность", field: "position", frozen: true, width: 80, headerFilter: "input"},
+                    moneyColumn("З/П", "base_salary"),
                     moneyColumn("Доп. З/П", "extra_salary"),
-                    bonusColumn("Премия квартальная", "bonus"),
+                    bonusColumn("Премия кв.", "bonus"),
                     bonusColumn("Доп. премия", "extra_bonus"),
                     moneyColumn("Отпускные", "vacation"),
                     moneyColumn("Больничные", "sick_leave"),
@@ -947,11 +1052,15 @@
         loadButton.addEventListener("click", loadTable);
         saveButton.addEventListener("click", saveTable);
         document.getElementById("save-bonus-modal").addEventListener("click", saveBonusModal);
+        document.getElementById("delete-bonus-modal").addEventListener("click", openBonusDeleteConfirm);
         document.getElementById("close-bonus-modal").addEventListener("click", closeBonusModal);
         document.getElementById("cancel-bonus-modal").addEventListener("click", closeBonusModal);
         document.getElementById("confirm-bonus-conflict").addEventListener("click", applyBonusUpdates);
         document.getElementById("close-bonus-conflict").addEventListener("click", closeBonusConflict);
         document.getElementById("cancel-bonus-conflict").addEventListener("click", closeBonusConflict);
+        document.getElementById("confirm-bonus-delete").addEventListener("click", deleteBonusRecord);
+        document.getElementById("close-bonus-delete").addEventListener("click", closeBonusDeleteConfirm);
+        document.getElementById("cancel-bonus-delete").addEventListener("click", closeBonusDeleteConfirm);
         statusToggle.addEventListener("click", () => {
             statusFilter.classList.toggle("visible");
             statusToggle.classList.toggle("open");

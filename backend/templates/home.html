@@ -5,6 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Основные страницы | Бюджетирование проектов ТКЗ</title>
+    <link rel="icon" href="{% static 'images/company_logo.ico' %}" type="image/x-icon">
     <style>
         :root {
             --bg-top: #f5efe5;
@@ -266,6 +267,13 @@
             background: #fbeaea;
         }
 
+        .sync-last-time {
+            margin-top: 12px;
+            color: var(--text-muted);
+            font-size: 0.92rem;
+            line-height: 1.45;
+        }
+
         .ok-button {
             display: none;
             margin-top: 14px;
@@ -352,6 +360,9 @@
             <div id="sync-status" class="sync-status">
                 Выберите режим синхронизации
             </div>
+            <div id="sync-last-time" class="sync-last-time">
+                Последняя синхронизация данных из Redmine: загрузка...
+            </div>
             <button class="ok-button" type="button" id="sync-ok-button">Ок</button>
         </section>
     </div>
@@ -359,6 +370,7 @@
     <script>
         const syncModal = document.getElementById("sync-modal-backdrop");
         const syncStatus = document.getElementById("sync-status");
+        const syncLastTime = document.getElementById("sync-last-time");
         const syncOkButton = document.getElementById("sync-ok-button");
         const syncButtons = Array.from(document.querySelectorAll(".sync-button"));
 
@@ -372,6 +384,7 @@
             syncStatus.textContent = "Выберите режим синхронизации";
             syncOkButton.classList.remove("visible");
             syncModal.classList.add("visible");
+            loadSyncStatus();
         }
 
         function closeSyncModal() {
@@ -382,6 +395,58 @@
             syncButtons.forEach((button) => {
                 button.disabled = disabled;
             });
+        }
+
+        function formatSyncDate(value) {
+            if (!value) {
+                return null;
+            }
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) {
+                return null;
+            }
+            return date.toLocaleString("ru-RU", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+            });
+        }
+
+        async function loadSyncStatus() {
+            syncLastTime.textContent = "Последняя синхронизация данных из Redmine: загрузка...";
+            try {
+                const response = await fetch("{% url 'redmine_sync:status' %}");
+                const payload = await response.json();
+                if (!response.ok || payload.status !== "ok") {
+                    throw new Error("Не удалось получить статус синхронизации.");
+                }
+
+                const states = [
+                    payload.employees,
+                    payload.projects,
+                    payload.time_entries_incremental,
+                    payload.time_entries_window,
+                    payload.time_entries_full,
+                ].filter(Boolean);
+                const lastSuccessValues = states
+                    .map((state) => state.last_success_at)
+                    .filter(Boolean)
+                    .map((value) => new Date(value))
+                    .filter((date) => !Number.isNaN(date.getTime()));
+
+                if (lastSuccessValues.length === 0) {
+                    syncLastTime.textContent = "Последняя синхронизация данных из Redmine: пока не выполнялась.";
+                    return;
+                }
+
+                const latest = new Date(Math.max(...lastSuccessValues.map((date) => date.getTime())));
+                syncLastTime.textContent = `Последняя синхронизация данных из Redmine: ${formatSyncDate(latest)}.`;
+            } catch (error) {
+                syncLastTime.textContent = "Последняя синхронизация данных из Redmine: не удалось получить статус.";
+            }
         }
 
         async function runSync(url, runningMessage, successMessage) {
@@ -401,6 +466,7 @@
                 }
                 syncStatus.className = "sync-status success";
                 syncStatus.textContent = successMessage;
+                await loadSyncStatus();
                 syncOkButton.classList.add("visible");
             } catch (error) {
                 syncStatus.className = "sync-status error";
