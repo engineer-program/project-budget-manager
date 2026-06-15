@@ -140,6 +140,7 @@
 
         .field {
             min-width: 220px;
+            position: relative;
         }
 
         .field.groups-field {
@@ -199,14 +200,19 @@
 
         .groups-checkboxes {
             display: none;
+            position: absolute;
+            top: 74px;
+            left: 0;
+            width: 100%;
+            z-index: 30;
             gap: 8px;
             max-height: 180px;
             overflow: auto;
             border: 1px solid var(--input-border);
             border-radius: 10px;
             padding: 10px 12px;
-            margin-top: 8px;
             background: #fff;
+            box-shadow: 0 18px 42px rgba(33, 49, 61, 0.18);
         }
 
         .groups-checkboxes.visible {
@@ -226,10 +232,15 @@
 
         .status-message {
             display: none;
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 80;
+            width: min(420px, calc(100vw - 32px));
             border-radius: 10px;
             padding: 12px 14px;
             font-size: 0.95rem;
-            margin-bottom: 16px;
+            box-shadow: 0 18px 42px rgba(33, 49, 61, 0.2);
         }
 
         .status-message.visible {
@@ -341,24 +352,12 @@
                 </div>
 
                 <div class="field status-filter-field">
-                    <label>Статус</label>
-                    <button id="status-toggle" class="button groups-toggle" type="button">
-                        Активен
-                    </button>
-                    <div id="status-filter" class="groups-checkboxes">
-                        <label class="group-checkbox">
-                            <input type="radio" name="active-status" value="1" checked>
-                            Активен
-                        </label>
-                        <label class="group-checkbox">
-                            <input type="radio" name="active-status" value="0">
-                            Заблокирован
-                        </label>
-                        <label class="group-checkbox">
-                            <input type="radio" name="active-status" value="all">
-                            Все
-                        </label>
-                    </div>
+                    <label for="status-filter">Статус</label>
+                    <select id="status-filter">
+                        <option value="1" selected>Активен</option>
+                        <option value="0">Заблокирован</option>
+                        <option value="all">Все</option>
+                    </select>
                 </div>
 
                 <div class="field groups-field">
@@ -387,7 +386,6 @@
     <script>
         const yearSelect = document.getElementById("year-filter");
         const quarterInputs = Array.from(document.querySelectorAll(".quarter-option input"));
-        const statusToggle = document.getElementById("status-toggle");
         const statusFilter = document.getElementById("status-filter");
         const groupsToggle = document.getElementById("groups-toggle");
         const groupFilter = document.getElementById("group-filter");
@@ -395,13 +393,22 @@
         const tablePanel = document.getElementById("table-panel");
         const statusMessage = document.getElementById("status-message");
         let table = null;
+        let statusTimer = null;
 
         function showStatus(message, type) {
+            if (statusTimer) {
+                clearTimeout(statusTimer);
+            }
             statusMessage.textContent = message;
             statusMessage.className = `status-message visible ${type}`;
+            statusTimer = setTimeout(clearStatus, 3000);
         }
 
         function clearStatus() {
+            if (statusTimer) {
+                clearTimeout(statusTimer);
+                statusTimer = null;
+            }
             statusMessage.textContent = "";
             statusMessage.className = "status-message";
         }
@@ -427,15 +434,10 @@
                 : `Выбрано групп: ${selectedCount}`;
         }
 
-        function updateStatusToggleText() {
-            const selected = statusFilter.querySelector("input[name='active-status']:checked");
-            statusToggle.textContent = selected ? selected.parentElement.textContent.trim() : "Активен";
-        }
-
         function getReportParams() {
             const params = new URLSearchParams({
                 year: yearSelect.value,
-                active: statusFilter.querySelector("input[name='active-status']:checked").value,
+                active: statusFilter.value,
             });
             quarterInputs
                 .filter((input) => input.checked)
@@ -453,7 +455,8 @@
                 hozAlign: "right",
                 sorter: "number",
                 formatter: (cell) => formatMoney(cell.getValue()),
-                minWidth: 100
+                minWidth: 100,
+                maxWidth: 130,
             };
         }
 
@@ -500,6 +503,7 @@
                 columnDefaults: {
                     headerSort: true,
                     resizable: true,
+                    headerWordWrap: true,
                 },
                 columns,
             });
@@ -573,20 +577,10 @@
             groupFilter.classList.toggle("visible");
             groupsToggle.classList.toggle("open");
         });
-        statusToggle.addEventListener("click", () => {
-            statusFilter.classList.toggle("visible");
-            statusToggle.classList.toggle("open");
-        });
-        statusFilter.querySelectorAll("input[name='active-status']").forEach((input) => {
-            input.addEventListener("change", () => {
-                updateStatusToggleText();
-                resetVisibleTable();
-            });
-        });
+        statusFilter.addEventListener("change", resetVisibleTable);
         loadButton.addEventListener("click", loadTable);
         yearSelect.addEventListener("change", resetVisibleTable);
         quarterInputs.forEach((input) => input.addEventListener("change", resetVisibleTable));
-        updateStatusToggleText();
         loadGroups();
     </script>
 </body>

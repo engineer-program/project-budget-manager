@@ -137,10 +137,15 @@
 
         .status-message {
             display: none;
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 80;
+            width: min(420px, calc(100vw - 32px));
             border-radius: 10px;
             padding: 12px 14px;
             font-size: 0.95rem;
-            margin-bottom: 16px;
+            box-shadow: 0 18px 42px rgba(33, 49, 61, 0.2);
         }
 
         .status-message.visible {
@@ -196,6 +201,8 @@
         .tabulator .tabulator-header,
         .tabulator .tabulator-header .tabulator-col {
             background: #eff5f9;
+            height: auto;
+            min-height: 44px;
         }
 
         .link-cell {
@@ -501,6 +508,7 @@
         let incomesTable = null;
         let currentProject = null;
         let pendingIncomeDeleteId = null;
+        let statusTimer = null;
 
         const statusMessage = document.getElementById("status-message");
         const toastContainer = document.getElementById("toast-container");
@@ -519,8 +527,16 @@
         }
 
         function showStatus(message, type) {
+            if (statusTimer) {
+                clearTimeout(statusTimer);
+            }
             statusMessage.textContent = message;
             statusMessage.className = `status-message visible ${type}`;
+            statusTimer = setTimeout(() => {
+                statusMessage.textContent = "";
+                statusMessage.className = "status-message";
+                statusTimer = null;
+            }, 3000);
         }
 
         function showToast(message, type = "success") {
@@ -592,13 +608,16 @@
                     dataTree: true,
                     dataTreeStartExpanded: false,
                     dataTreeChildIndent: 28,
+                    columnDefaults: {
+                        headerWordWrap: true,
+                    },
                     columns: [
-                        {title: "Имя проекта", field: "name", width: 300, frozen: true, headerFilter: "input", formatter: linkFormatter, cellClick: (_, cell) => openProjectCard(cell.getRow().getData().id)},
-                        {title: "Номер проекта", field: "project_number", width: 160, headerFilter: "input"},
-                        {title: "Наименование в 1С", field: "name_1s", width: 240, headerFilter: "input"},
+                        {title: "Номер проекта", field: "project_number", width: 280, frozen: true, headerFilter: "input", formatter: linkFormatter, cellClick: (_, cell) => openProjectCard(cell.getRow().getData().id)},
+                        {title: "Наименование в 1С", field: "name_1s", width: 220, headerFilter: "input"},
+                        {title: "Имя проекта", field: "name", width: 250, headerFilter: "input"},
                         moneyColumn("Стартовый бюджет", "start_budget"),
                         moneyColumn("Бюджет на сегодня", "budget_today"),
-                        {title: "Суммарные доходы", field: "total_income", hozAlign: "right", sorter: "number", formatter: linkMoneyFormatter, cellClick: (_, cell) => openProjectIncomes(cell.getRow().getData().id)},
+                        {title: "Суммарные доходы", field: "total_income", widthGrow: 1, maxWidth: 130, hozAlign: "right", sorter: "number", formatter: linkMoneyFormatter, cellClick: (_, cell) => openProjectIncomes(cell.getRow().getData().id)},
                         moneyColumn("Суммарные расходы", "total_expense"),
                     ],
                 });
@@ -614,6 +633,8 @@
                 hozAlign: "right",
                 sorter: "number",
                 formatter: (cell) => formatMoney(cell.getValue()),
+                maxWidth: 130,
+                widthGrow: 1,
             };
         }
 

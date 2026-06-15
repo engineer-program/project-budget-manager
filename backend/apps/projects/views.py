@@ -11,6 +11,8 @@ from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
+from apps.audit.models import ChangeLog
+from apps.audit.services import log_change, serialize_instance
 from apps.employees.models import Employee
 from apps.finance.models import ExpenseCategory, ProjectExpense, ProjectIncome
 
@@ -22,7 +24,9 @@ ZERO = Decimal("0.00")
 def _format_datetime(value) -> str:
     if value is None:
         return "-"
-    return timezone.localtime(value).strftime("%d.%m.%Y %H:%M")
+    if timezone.is_aware(value):
+        value = timezone.localtime(value)
+    return value.strftime("%d.%m.%Y %H:%M")
 
 
 def _format_amount(value: Decimal | None) -> str:
@@ -208,9 +212,19 @@ def project_budget_update_view(request: HttpRequest, project_id: int) -> JsonRes
     if error_response:
         return error_response
 
+    before_data = serialize_instance(project, ["start_budget", "budget_updated_by_id"])
     project.start_budget = _parse_amount(payload.get("start_budget"))
     project.budget_updated_by = request.user
-    project.save(update_fields=["start_budget", "budget_updated_by", "updated_at"])
+    after_data = serialize_instance(project, ["start_budget", "budget_updated_by_id"])
+    if before_data != after_data:
+        project.save(update_fields=["start_budget", "budget_updated_by", "updated_at"])
+        log_change(
+            user=request.user,
+            entity=project,
+            action=ChangeLog.ACTION_UPDATE,
+            before_data=before_data,
+            after_data=after_data,
+        )
     return JsonResponse({"status": "ok", "start_budget": _format_amount(project.start_budget)})
 
 
@@ -255,7 +269,7 @@ def project_income_create_view(request: HttpRequest, project_id: int) -> JsonRes
     if error_response:
         return error_response
 
-    ProjectIncome.objects.create(
+    income = ProjectIncome.objects.create(
         project=project,
         article=str(payload.get("article") or "").strip(),
         amount=_parse_amount(payload.get("amount")),
@@ -263,6 +277,13 @@ def project_income_create_view(request: HttpRequest, project_id: int) -> JsonRes
         description=str(payload.get("description") or "").strip(),
         income_date=payload.get("date"),
         created_by=request.user,
+    )
+    log_change(
+        user=request.user,
+        entity=income,
+        action=ChangeLog.ACTION_CREATE,
+        before_data=None,
+        after_data=serialize_instance(income),
     )
     return JsonResponse({"status": "ok"})
 
@@ -273,6 +294,14 @@ def project_income_delete_view(request: HttpRequest, project_id: int, income_id:
     project = get_object_or_404(Project, id=project_id)
     project_ids = _project_ids_with_descendants(project.id)
     income = get_object_or_404(ProjectIncome, id=income_id, project_id__in=project_ids)
+    before_data = serialize_instance(income)
+    log_change(
+        user=request.user,
+        entity=income,
+        action=ChangeLog.ACTION_DELETE,
+        before_data=before_data,
+        after_data=None,
+    )
     income.delete()
     return JsonResponse({"status": "ok"})
 
@@ -297,7 +326,7 @@ def project_expense_create_view(request: HttpRequest, project_id: int) -> JsonRe
         return JsonResponse({"status": "error", "message": "Укажите статью расхода."}, status=400)
 
     category, _ = ExpenseCategory.objects.get_or_create(name=category_name)
-    ProjectExpense.objects.create(
+    expense = ProjectExpense.objects.create(
         project=project,
         category=category,
         amount=_parse_amount(payload.get("amount")),
@@ -305,5 +334,12 @@ def project_expense_create_view(request: HttpRequest, project_id: int) -> JsonRe
         description=str(payload.get("description") or "").strip(),
         expense_date=payload.get("date"),
         created_by=request.user,
+    )
+    log_change(
+        user=request.user,
+        entity=expense,
+        action=ChangeLog.ACTION_CREATE,
+        before_data=None,
+        after_data=serialize_instance(expense),
     )
     return JsonResponse({"status": "ok"})
