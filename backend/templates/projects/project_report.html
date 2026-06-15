@@ -1,0 +1,460 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Отчёт по проектам | Бюджетирование проектов ТКЗ</title>
+    <link rel="icon" href="{% static 'images/company_logo.ico' %}" type="image/x-icon">
+    <link rel="stylesheet" href="{% static 'vendor/tabulator/tabulator.min.css' %}">
+    <style>
+        :root {
+            --bg-top: #f5efe5;
+            --bg-bottom: #dce6ef;
+            --panel: rgba(255, 255, 255, 0.93);
+            --panel-border: rgba(123, 95, 61, 0.16);
+            --text-main: #21313d;
+            --text-muted: #667786;
+            --accent: #4ba7e9;
+            --accent-hover: #3a86bc;
+            --shadow: 0 24px 60px rgba(33, 49, 61, 0.14);
+            --input-border: #d1d8de;
+            --success-bg: #e9f7ef;
+            --success-text: #22643e;
+            --error-bg: #fbeaea;
+            --error-text: #9c2f2f;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+            background:
+                radial-gradient(circle at top left, rgba(75, 167, 233, 0.12), transparent 34%),
+                linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+        }
+
+        .page {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 28px 24px 40px;
+            position: relative;
+        }
+
+        .page-logo {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+        }
+
+        .topbar,
+        .topbar-actions,
+        .filters,
+        .quarter-options {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .topbar {
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .topbar-actions {
+            justify-content: flex-end;
+            margin-left: auto;
+        }
+
+        .filters {
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .back-link,
+        .admin-link,
+        .logout-button,
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(33, 49, 61, 0.08);
+            border-radius: 10px;
+            padding: 10px 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-decoration: none;
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.78);
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .button.primary {
+            color: #fff;
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .button.primary:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        .back-link {
+            margin-left: 64px;
+        }
+
+        .logout-form {
+            margin: 0;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 30px 28px;
+        }
+
+        .panel + .panel {
+            margin-top: 22px;
+        }
+
+        .heading {
+            text-align: center;
+            margin: 0 0 28px;
+            font-size: 2rem;
+            line-height: 1.15;
+        }
+
+        .field {
+            min-width: 220px;
+            position: relative;
+        }
+
+        .field label,
+        .field-title {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .field select {
+            width: 100%;
+            border: 1px solid var(--input-border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 1rem;
+            background: #fff;
+            color: var(--text-main);
+        }
+
+        .quarter-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font-size: 0.92rem;
+            line-height: 1.25;
+            cursor: pointer;
+        }
+
+        .quarter-options {
+            min-height: 44px;
+        }
+
+        .status-message {
+            display: none;
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 80;
+            width: min(460px, calc(100vw - 32px));
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            box-shadow: 0 18px 42px rgba(33, 49, 61, 0.2);
+        }
+
+        .status-message.visible {
+            display: block;
+        }
+
+        .status-message.success {
+            background: var(--success-bg);
+            color: var(--success-text);
+        }
+
+        .status-message.error {
+            background: var(--error-bg);
+            color: var(--error-text);
+        }
+
+        .table-panel {
+            display: none;
+        }
+
+        .table-panel.visible {
+            display: block;
+        }
+
+        #project-report-table {
+            border: 1px solid rgba(33, 49, 61, 0.08);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .tabulator {
+            background: transparent;
+            border: 0;
+            font-size: 0.88rem;
+        }
+
+        .tabulator .tabulator-header,
+        .tabulator .tabulator-header .tabulator-col {
+            background: #eff5f9;
+        }
+
+        @media (max-width: 700px) {
+            .page {
+                padding: 20px 16px 32px;
+            }
+
+            .page-logo {
+                top: 20px;
+                left: 16px;
+                width: 38px;
+                height: 38px;
+            }
+
+            .topbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .topbar-actions {
+                justify-content: flex-start;
+                margin-left: 0;
+            }
+
+            .panel {
+                padding: 24px 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <img class="page-logo" src="{% static 'images/company_logo.ico' %}" alt="Логотип компании">
+
+        <div class="topbar">
+            <a class="back-link" href="{% url 'home' %}">На главную</a>
+            <div class="topbar-actions">
+                {% if request.user.is_superuser or request.user.is_staff %}
+                    <a class="admin-link" href="{% url 'admin:index' %}">Администрирование</a>
+                {% endif %}
+                <form class="logout-form" method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button class="logout-button" type="submit">Выйти</button>
+                </form>
+            </div>
+        </div>
+
+        <section class="panel">
+            <h1 class="heading">Отчёт по проектам</h1>
+            <div id="status-message" class="status-message"></div>
+
+            <div class="filters">
+                <div class="field">
+                    <label for="year-filter">Год</label>
+                    <select id="year-filter">
+                        {% for value, title in year_choices %}
+                            <option value="{{ value }}"{% if value == current_year %} selected{% endif %}>{{ title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <span class="field-title">Квартал</span>
+                    <div class="quarter-options">
+                        <label class="quarter-option"><input type="checkbox" value="1"> I</label>
+                        <label class="quarter-option"><input type="checkbox" value="2"> II</label>
+                        <label class="quarter-option"><input type="checkbox" value="3"> III</label>
+                        <label class="quarter-option"><input type="checkbox" value="4"> IV</label>
+                    </div>
+                </div>
+
+                <button id="load-table-button" class="button primary" type="button">
+                    Отобразить отчёт по проектам
+                </button>
+            </div>
+        </section>
+
+        <section id="table-panel" class="panel table-panel">
+            <div id="project-report-table"></div>
+        </section>
+    </div>
+
+    <script src="{% static 'vendor/tabulator/tabulator.min.js' %}"></script>
+    <script>
+        const yearSelect = document.getElementById("year-filter");
+        const quarterInputs = Array.from(document.querySelectorAll(".quarter-option input"));
+        const loadButton = document.getElementById("load-table-button");
+        const tablePanel = document.getElementById("table-panel");
+        const statusMessage = document.getElementById("status-message");
+        let table = null;
+        let statusTimer = null;
+
+        function showStatus(message, type) {
+            if (statusTimer) {
+                clearTimeout(statusTimer);
+            }
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message visible ${type}`;
+            statusTimer = setTimeout(clearStatus, 3000);
+        }
+
+        function clearStatus() {
+            if (statusTimer) {
+                clearTimeout(statusTimer);
+                statusTimer = null;
+            }
+            statusMessage.textContent = "";
+            statusMessage.className = "status-message";
+        }
+
+        function resetVisibleTable() {
+            tablePanel.classList.remove("visible");
+            clearStatus();
+        }
+
+        function normalizeMoney(value) {
+            const normalized = Number(String(value || "0").replace(",", "."));
+            return Number.isNaN(normalized) ? "0.00" : normalized.toFixed(2);
+        }
+
+        function formatMoney(value) {
+            return `${normalizeMoney(value)}₽`;
+        }
+
+        function getReportParams() {
+            const params = new URLSearchParams({year: yearSelect.value});
+            quarterInputs
+                .filter((input) => input.checked)
+                .forEach((input) => params.append("quarters", input.value));
+            return params;
+        }
+
+        function moneyColumn(title, field, width = 116) {
+            return {
+                title,
+                field,
+                hozAlign: "right",
+                sorter: "number",
+                formatter: (cell) => formatMoney(cell.getValue()),
+                minWidth: width,
+                width,
+            };
+        }
+
+        function buildColumns(months) {
+            const columns = [
+                {title: "Номер проекта", field: "project_number", frozen: true, width: 150, headerFilter: "input"},
+                {title: "Наименование в 1С", field: "name_1s", frozen: true, width: 220, headerFilter: "input"},
+                {title: "Наименование проекта", field: "name", frozen: true, width: 320, headerFilter: "input"},
+                moneyColumn("Стартовый бюджет", "start_budget", 140),
+            ];
+
+            months.forEach((month) => {
+                const prefix = `month_${month.key}`;
+                columns.push({
+                    title: month.title,
+                    hozAlign: "center",
+                    columns: [
+                        moneyColumn("Бюджет на начало месяца", `${prefix}_budget_start`, 150),
+                        moneyColumn("Доходы", `${prefix}_income`),
+                        moneyColumn("Расходы на З/П", `${prefix}_base_salary_expense`),
+                        moneyColumn("Расходы на доп. З/П", `${prefix}_extra_salary_expense`),
+                        moneyColumn("Расходы на премию кв.", `${prefix}_bonus_expense`),
+                        moneyColumn("Расходы на доп. премию", `${prefix}_extra_bonus_expense`),
+                        moneyColumn("Расходы на отпускные", `${prefix}_vacation_expense`),
+                        moneyColumn("Расходы на больничные", `${prefix}_sick_leave_expense`),
+                        moneyColumn("Расходы на командировочные", `${prefix}_business_trip_expense`),
+                        moneyColumn("Иные расходы", `${prefix}_other_expense`),
+                    ],
+                });
+            });
+
+            columns.push(moneyColumn("Доходы за период", "period_income", 140));
+            columns.push(moneyColumn("Расходы за период", "period_expense", 140));
+            return columns;
+        }
+
+        function buildTable(rows, months) {
+            const columns = buildColumns(months);
+            if (table) {
+                table.setColumns(columns);
+                table.replaceData(rows);
+                return;
+            }
+
+            table = new Tabulator("#project-report-table", {
+                data: rows,
+                index: "id",
+                layout: "fitDataStretch",
+                height: "700px",
+                movableColumns: true,
+                dataTree: true,
+                dataTreeStartExpanded: false,
+                columnDefaults: {
+                    headerSort: true,
+                    resizable: true,
+                    headerWordWrap: true,
+                },
+                columns,
+            });
+        }
+
+        async function loadReport() {
+            clearStatus();
+            loadButton.disabled = true;
+            loadButton.textContent = "Загрузка...";
+
+            try {
+                const response = await fetch(`{% url 'project-report-data' %}?${getReportParams()}`);
+                const payload = await response.json();
+                if (!response.ok || payload.status !== "ok") {
+                    throw new Error(payload.message || "Не удалось загрузить отчёт по проектам.");
+                }
+
+                tablePanel.classList.add("visible");
+                buildTable(payload.rows, payload.months);
+                if (payload.opr_project_found) {
+                    showStatus("Отчёт по проектам загружен.", "success");
+                } else {
+                    showStatus("Отчёт загружен, но проект ОПР не найден: общепроизводственные расходы не распределены.", "error");
+                }
+            } catch (error) {
+                showStatus(error.message, "error");
+            } finally {
+                loadButton.disabled = false;
+                loadButton.textContent = "Отобразить отчёт по проектам";
+            }
+        }
+
+        loadButton.addEventListener("click", loadReport);
+        yearSelect.addEventListener("change", resetVisibleTable);
+        quarterInputs.forEach((input) => input.addEventListener("change", resetVisibleTable));
+    </script>
+</body>
+</html>
