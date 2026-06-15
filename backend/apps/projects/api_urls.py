@@ -7,11 +7,13 @@ from .views import (
     project_income_create_view,
     project_income_delete_view,
     project_incomes_view,
+    project_report_data_view,
     projects_data_view,
 )
 
 urlpatterns = [
     path("", projects_data_view, name="projects-data"),
+    path("report/", project_report_data_view, name="project-report-data"),
     path("<int:project_id>/", project_detail_view, name="project-detail"),
     path("<int:project_id>/budget/", project_budget_update_view, name="project-budget-update"),
     path("<int:project_id>/incomes/", project_incomes_view, name="project-incomes"),

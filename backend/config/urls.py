@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.contrib.auth.views import LoginView, LogoutView
 from django.urls import include, path
 
+from apps.projects.views import project_report_page_view
+
 from .views import healthcheck_view, home_view, section_placeholder_view
 
 urlpatterns = [
@@ -20,7 +22,7 @@ urlpatterns = [
     path("api/projects/", include("apps.projects.api_urls")),
     path("pages/", include("apps.employees.urls")),
     path("pages/projects/", include("apps.projects.urls")),
-    path("pages/project-report/", section_placeholder_view, {"title": "Отчет по проектам"}, name="project-report"),
+    path("pages/project-report/", project_report_page_view, name="project-report"),
     path(
         "pages/project-yearly-stats/",
         section_placeholder_view,
