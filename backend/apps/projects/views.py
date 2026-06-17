@@ -156,10 +156,8 @@ def _project_report_expense_total(metrics: dict[str, Decimal]) -> Decimal:
 
 def _find_opr_project_id() -> int | None:
     project = (
-        Project.objects.filter(
-            Q(project_number__iexact="ОПР")
-            | Q(project_number__iexact="OPR")
-            | Q(name__iexact="Общепроизводственные работы")
+        Project.objects.filter(is_deleted_in_redmine=False).filter(
+            Q(redmine_project_id__iexact=232)
         )
         .order_by("id")
         .first()
@@ -197,7 +195,7 @@ def _project_totals() -> tuple[dict[int, Decimal], dict[int, Decimal]]:
 
 
 def _project_ids_with_descendants(project_id: int) -> set[int]:
-    projects = Project.objects.values("id", "parent_project_id")
+    projects = Project.objects.filter(is_deleted_in_redmine=False).values("id", "parent_project_id")
     children_by_parent: dict[int | None, list[int]] = {}
     for project in projects:
         children_by_parent.setdefault(project["parent_project_id"], []).append(project["id"])
@@ -217,7 +215,10 @@ def _project_ids_with_descendants(project_id: int) -> set[int]:
 def _aggregate_project_values(project_id: int) -> dict[str, Decimal]:
     project_ids = _project_ids_with_descendants(project_id)
     start_budget = (
-        Project.objects.filter(id__in=project_ids).aggregate(total=Sum("start_budget"))["total"] or ZERO
+        Project.objects.filter(id__in=project_ids, is_deleted_in_redmine=False).aggregate(total=Sum("start_budget"))[
+            "total"
+        ]
+        or ZERO
     )
     total_income = (
         ProjectIncome.objects.filter(project_id__in=project_ids).aggregate(total=Sum("amount"))["total"] or ZERO
@@ -234,7 +235,7 @@ def _aggregate_project_values(project_id: int) -> dict[str, Decimal]:
 
 
 def _project_tree_rows() -> list[dict[str, Any]]:
-    projects = list(Project.objects.all().select_related("project_manager"))
+    projects = list(Project.objects.filter(is_deleted_in_redmine=False).select_related("project_manager"))
     income_totals, expense_totals = _project_totals()
     project_ids = {project.id for project in projects}
     children_by_parent: dict[int | None, list[Project]] = {}
@@ -285,11 +286,10 @@ def _project_tree_rows() -> list[dict[str, Any]]:
 def _project_report_rows(year: int, quarters: list[int]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     selected_months = [month for quarter in quarters for month in QUARTER_MONTHS[quarter]]
     selected_keys = [(year, month) for month in selected_months]
-    timeline_keys = _iter_month_keys(REPORT_START_YEAR, 1, year, max(selected_months))
-    timeline_start, _ = _month_period(REPORT_START_YEAR, 1)
+    timeline_keys = _iter_month_keys(year, min(selected_months), year, max(selected_months))
+    timeline_start, _ = _month_period(year, min(selected_months))
     _, timeline_end = _month_period(year, max(selected_months))
-
-    projects = list(Project.objects.all())
+    projects = list(Project.objects.filter(is_deleted_in_redmine=False))
     project_by_id = {project.id: project for project in projects}
     project_ids = set(project_by_id)
     children_by_parent: dict[int | None, list[Project]] = {}
@@ -323,7 +323,13 @@ def _project_report_rows(year: int, quarters: list[int]) -> tuple[list[dict[str,
     employee_month_hours: dict[tuple[int, int, int], Decimal] = {}
     employee_project_month_hours: dict[tuple[int, int, int, int], Decimal] = {}
     for item in (
-        RedmineTimeEntry.objects.filter(spent_on__gte=timeline_start, spent_on__lte=timeline_end)
+        RedmineTimeEntry.objects.filter(
+            spent_on__gte=timeline_start,
+            spent_on__lte=timeline_end,
+            is_deleted_in_redmine=False,
+            project__is_deleted_in_redmine=False,
+            user__is_deleted_in_redmine=False,
+        )
         .annotate(report_year=ExtractYear("spent_on"), report_month=ExtractMonth("spent_on"))
         .values("user_id", "project_id", "report_year", "report_month")
         .annotate(total_hours=Sum("hours"))
@@ -350,7 +356,6 @@ def _project_report_rows(year: int, quarters: list[int]) -> tuple[list[dict[str,
         salary = salary_map.get((employee_id, item_year, item_month))
         if salary is None:
             continue
-
         ratio = project_hours / total_hours
         metrics = own_metrics[project_id][(item_year, item_month)]
         metrics["base_salary_expense"] += (salary.base_salary * ratio).quantize(Decimal("0.01"))
@@ -534,6 +539,7 @@ def project_detail_view(request: HttpRequest, project_id: int) -> JsonResponse:
     project = get_object_or_404(
         Project.objects.select_related("project_manager"),
         id=project_id,
+        is_deleted_in_redmine=False,
     )
     aggregate_values = _aggregate_project_values(project.id)
 
@@ -561,7 +567,7 @@ def project_detail_view(request: HttpRequest, project_id: int) -> JsonResponse:
 @login_required
 @require_POST
 def project_budget_update_view(request: HttpRequest, project_id: int) -> JsonResponse:
-    project = get_object_or_404(Project, id=project_id)
+    project = get_object_or_404(Project, id=project_id, is_deleted_in_redmine=False)
     payload, error_response = _load_json_payload(request)
     if error_response:
         return error_response
@@ -585,7 +591,7 @@ def project_budget_update_view(request: HttpRequest, project_id: int) -> JsonRes
 @login_required
 @require_GET
 def project_incomes_view(request: HttpRequest, project_id: int) -> JsonResponse:
-    project = get_object_or_404(Project, id=project_id)
+    project = get_object_or_404(Project, id=project_id, is_deleted_in_redmine=False)
     project_ids = _project_ids_with_descendants(project.id)
     rows = []
     for income in (
@@ -611,7 +617,7 @@ def project_incomes_view(request: HttpRequest, project_id: int) -> JsonResponse:
 @login_required
 @require_POST
 def project_income_create_view(request: HttpRequest, project_id: int) -> JsonResponse:
-    project = get_object_or_404(Project, id=project_id)
+    project = get_object_or_404(Project, id=project_id, is_deleted_in_redmine=False)
     employee = _get_user_employee(request)
     if employee is None:
         return JsonResponse(
@@ -645,7 +651,7 @@ def project_income_create_view(request: HttpRequest, project_id: int) -> JsonRes
 @login_required
 @require_POST
 def project_income_delete_view(request: HttpRequest, project_id: int, income_id: int) -> JsonResponse:
-    project = get_object_or_404(Project, id=project_id)
+    project = get_object_or_404(Project, id=project_id, is_deleted_in_redmine=False)
     project_ids = _project_ids_with_descendants(project.id)
     income = get_object_or_404(ProjectIncome, id=income_id, project_id__in=project_ids)
     before_data = serialize_instance(income)
@@ -663,7 +669,7 @@ def project_income_delete_view(request: HttpRequest, project_id: int, income_id:
 @login_required
 @require_POST
 def project_expense_create_view(request: HttpRequest, project_id: int) -> JsonResponse:
-    project = get_object_or_404(Project, id=project_id)
+    project = get_object_or_404(Project, id=project_id, is_deleted_in_redmine=False)
     employee = _get_user_employee(request)
     if employee is None:
         return JsonResponse(

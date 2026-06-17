@@ -15,6 +15,8 @@ class Employee(models.Model):
     dismissal_date = models.DateField(null=True, blank=True)
     email = models.EmailField(max_length=255, blank=True, db_index=True)
     active = models.BooleanField(default=True, db_index=True)
+    synced_at = models.DateTimeField(null=True, blank=True)
+    is_deleted_in_redmine = models.BooleanField(default=False, db_index=True)
 
     class Meta:
         db_table = "employees"

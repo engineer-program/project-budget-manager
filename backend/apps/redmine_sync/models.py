@@ -20,6 +20,8 @@ class RedmineTimeEntry(models.Model):
     activity_id = models.IntegerField(db_index=True)
     spent_on = models.DateField()
     created_at = models.DateTimeField()
+    redmine_updated_on = models.DateTimeField(null=True, blank=True)
+    is_deleted_in_redmine = models.BooleanField(default=False, db_index=True)
 
     class Meta:
         db_table = "redmine_time_entries"

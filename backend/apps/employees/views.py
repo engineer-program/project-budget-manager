@@ -143,6 +143,14 @@ def _parse_employee_ids(raw_values: list[Any] | None) -> list[int]:
     return employee_ids
 
 
+def _existing_employee_ids(employee_ids: list[int]) -> list[int]:
+    if not employee_ids:
+        return []
+    return list(
+        Employee.objects.filter(id__in=employee_ids, is_deleted_in_redmine=False).values_list("id", flat=True)
+    )
+
+
 def _parse_active_filter(raw_value: Any) -> str:
     if raw_value in (None, ""):
         return "active"
@@ -171,7 +179,7 @@ def _employees_queryset(
     period_start: date | None = None,
     period_end: date | None = None,
 ):
-    queryset = Employee.objects.all()
+    queryset = Employee.objects.filter(is_deleted_in_redmine=False)
     if status != "all" and period_start is not None and period_end is not None:
         active_for_period = (
             Q(active=True)
@@ -679,9 +687,7 @@ def _save_employee_salary_rows(year: int, month: int, rows: list[dict[str, Any]]
         return 0
 
     employee_ids = {int(row["employee_id"]) for row in rows if row.get("employee_id")}
-    existing_employee_ids = set(
-        Employee.objects.filter(id__in=employee_ids).values_list("id", flat=True)
-    )
+    existing_employee_ids = set(_existing_employee_ids(list(employee_ids)))
     compensation_types = {
         item.code: item
         for item in CompensationType.objects.filter(code__in=COMPENSATION_CODES)
@@ -991,7 +997,7 @@ def employee_bonus_save_view(request: HttpRequest) -> JsonResponse:
         employee_id <= 0
         or bonus_year is None
         or bonus_quarter not in QUARTER_MONTHS
-        or not Employee.objects.filter(id=employee_id).exists()
+        or not Employee.objects.filter(id=employee_id, is_deleted_in_redmine=False).exists()
     ):
         return JsonResponse(
             {"status": "error", "message": "Некорректные данные премии."},
@@ -1200,7 +1206,7 @@ def employee_salaries_clear_columns_view(request: HttpRequest) -> JsonResponse:
         )
 
     year, month = _validate_period(payload)
-    employee_ids = _parse_employee_ids(payload.get("employee_ids"))
+    employee_ids = _existing_employee_ids(_parse_employee_ids(payload.get("employee_ids")))
     raw_columns = payload.get("columns")
     columns = set(raw_columns) if isinstance(raw_columns, list) else set()
     invalid_columns = columns - CLEARABLE_SALARY_COLUMNS
@@ -1239,7 +1245,7 @@ def employee_salaries_copy_columns_view(request: HttpRequest) -> JsonResponse:
             "month": payload.get("source_month"),
         }
     )
-    employee_ids = _parse_employee_ids(payload.get("employee_ids"))
+    employee_ids = _existing_employee_ids(_parse_employee_ids(payload.get("employee_ids")))
     raw_columns = payload.get("columns")
     columns = set(raw_columns) if isinstance(raw_columns, list) else set()
     invalid_columns = columns - COPYABLE_SALARY_COLUMNS

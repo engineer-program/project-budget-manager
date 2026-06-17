@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 import MySQLdb
@@ -203,6 +203,32 @@ class RedmineReader:
         """
         params.append(limit)
         return self._fetch_all(query, params)
+
+    def fetch_time_entry_ids(self) -> list[int]:
+        query = """
+        SELECT te.id AS redmine_time_entry_id
+        FROM time_entries te
+        """
+        return [item["redmine_time_entry_id"] for item in self._fetch_all(query)]
+
+    def fetch_time_entry_ids_by_spent_on(
+        self,
+        *,
+        start_date: date,
+        end_date: date | None = None,
+    ) -> list[int]:
+        query = """
+        SELECT te.id AS redmine_time_entry_id
+        FROM time_entries te
+        WHERE te.spent_on >= %s
+        """
+        params: list[Any] = [start_date]
+
+        if end_date is not None:
+            query += "\nAND te.spent_on <= %s"
+            params.append(end_date)
+
+        return [item["redmine_time_entry_id"] for item in self._fetch_all(query, params)]
 
     def _fetch_all(
         self,

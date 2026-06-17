@@ -14,6 +14,7 @@ class Project(TimestampedModel):
     redmine_created_on = models.DateTimeField(null=True, blank=True)
     redmine_updated_on = models.DateTimeField(null=True, blank=True)
     synced_at = models.DateTimeField(null=True, blank=True)
+    is_deleted_in_redmine = models.BooleanField(default=False, db_index=True)
     parent_project = models.ForeignKey(
         "self",
         on_delete=models.PROTECT,
