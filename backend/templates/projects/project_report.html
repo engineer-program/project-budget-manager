@@ -355,7 +355,7 @@
             return params;
         }
 
-        function moneyColumn(title, field, width = 116) {
+        function moneyColumn(title, field, width = 130) {
             return {
                 title,
                 field,
@@ -369,10 +369,10 @@
 
         function buildColumns(months) {
             const columns = [
-                {title: "Номер проекта", field: "project_number", frozen: true, width: 150, headerFilter: "input"},
-                {title: "Наименование в 1С", field: "name_1s", frozen: true, width: 220, headerFilter: "input"},
-                {title: "Наименование проекта", field: "name", frozen: true, width: 320, headerFilter: "input"},
-                moneyColumn("Стартовый бюджет", "start_budget", 140),
+                {title: "Номер проекта", field: "project_number", frozen: true, width: 200, headerFilter: "input"},
+                {title: "Наименование в 1С", field: "name_1s", frozen: true, width: 200, headerFilter: "input"},
+                {title: "Наименование проекта", field: "name", frozen: true, width: 250, headerFilter: "input"},
+                moneyColumn("Стартовый бюджет", "start_budget"),
             ];
 
             months.forEach((month) => {
@@ -381,7 +381,7 @@
                     title: month.title,
                     hozAlign: "center",
                     columns: [
-                        moneyColumn("Бюджет на начало месяца", `${prefix}_budget_start`, 150),
+                        moneyColumn("Бюджет на начало месяца", `${prefix}_budget_start`),
                         moneyColumn("Доходы", `${prefix}_income`),
                         moneyColumn("Расходы на З/П", `${prefix}_base_salary_expense`),
                         moneyColumn("Расходы на доп. З/П", `${prefix}_extra_salary_expense`),
@@ -395,8 +395,8 @@
                 });
             });
 
-            columns.push(moneyColumn("Доходы за период", "period_income", 140));
-            columns.push(moneyColumn("Расходы за период", "period_expense", 140));
+            columns.push(moneyColumn("Доходы за период", "period_income"));
+            columns.push(moneyColumn("Расходы за период", "period_expense"));
             return columns;
         }
 
