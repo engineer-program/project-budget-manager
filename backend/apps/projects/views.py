@@ -55,6 +55,15 @@ PROJECT_REPORT_EXPENSE_FIELDS = (
     "business_trip_expense",
     "other_expense",
 )
+PROJECT_STATUS_OPEN = "open"
+PROJECT_STATUS_CLOSED = "closed"
+PROJECT_STATUS_ARCHIVED = "archived"
+PROJECT_STATUS_ALL = "all"
+PROJECT_STATUS_CODES = {
+    PROJECT_STATUS_OPEN: (1, 15),
+    PROJECT_STATUS_CLOSED: (5,),
+    PROJECT_STATUS_ARCHIVED: (9,),
+}
 
 
 def _format_datetime(value) -> str:
@@ -106,6 +115,27 @@ def _parse_quarters(raw_values: list[str] | str | None) -> list[int]:
         if quarter in QUARTER_MONTHS and quarter not in quarters:
             quarters.append(quarter)
     return sorted(quarters)
+
+
+def _parse_project_status(raw_value: Any) -> str:
+    value = str(raw_value or PROJECT_STATUS_OPEN).strip().lower()
+    if value in {PROJECT_STATUS_OPEN, PROJECT_STATUS_CLOSED, PROJECT_STATUS_ARCHIVED, PROJECT_STATUS_ALL}:
+        return value
+    if value in {"1", "15"}:
+        return PROJECT_STATUS_OPEN
+    if value == "5":
+        return PROJECT_STATUS_CLOSED
+    if value == "9":
+        return PROJECT_STATUS_ARCHIVED
+    return PROJECT_STATUS_OPEN
+
+
+def _projects_queryset(project_status: str = PROJECT_STATUS_OPEN):
+    queryset = Project.objects.filter(is_deleted_in_redmine=False)
+    status_codes = PROJECT_STATUS_CODES.get(project_status)
+    if status_codes:
+        queryset = queryset.filter(status__in=status_codes)
+    return queryset
 
 
 def _month_period(year: int, month: int) -> tuple[date, date]:
@@ -234,8 +264,8 @@ def _aggregate_project_values(project_id: int) -> dict[str, Decimal]:
     }
 
 
-def _project_tree_rows() -> list[dict[str, Any]]:
-    projects = list(Project.objects.filter(is_deleted_in_redmine=False).select_related("project_manager"))
+def _project_tree_rows(project_status: str = PROJECT_STATUS_OPEN) -> list[dict[str, Any]]:
+    projects = list(_projects_queryset(project_status).select_related("project_manager"))
     income_totals, expense_totals = _project_totals()
     project_ids = {project.id for project in projects}
     children_by_parent: dict[int | None, list[Project]] = {}
@@ -283,13 +313,17 @@ def _project_tree_rows() -> list[dict[str, Any]]:
     return [build_node(project, set()) for project in children_by_parent.get(None, [])]
 
 
-def _project_report_rows(year: int, quarters: list[int]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _project_report_rows(
+    year: int,
+    quarters: list[int],
+    project_status: str = PROJECT_STATUS_OPEN,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     selected_months = [month for quarter in quarters for month in QUARTER_MONTHS[quarter]]
     selected_keys = [(year, month) for month in selected_months]
     timeline_keys = _iter_month_keys(year, min(selected_months), year, max(selected_months))
     timeline_start, _ = _month_period(year, min(selected_months))
     _, timeline_end = _month_period(year, max(selected_months))
-    projects = list(Project.objects.filter(is_deleted_in_redmine=False))
+    projects = list(_projects_queryset(project_status))
     project_by_id = {project.id: project for project in projects}
     project_ids = set(project_by_id)
     children_by_parent: dict[int | None, list[Project]] = {}
@@ -500,7 +534,8 @@ def project_report_page_view(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_GET
 def projects_data_view(request: HttpRequest) -> JsonResponse:
-    return JsonResponse({"status": "ok", "rows": _project_tree_rows()})
+    project_status = _parse_project_status(request.GET.get("project_status"))
+    return JsonResponse({"status": "ok", "project_status": project_status, "rows": _project_tree_rows(project_status)})
 
 
 @login_required
@@ -508,6 +543,7 @@ def projects_data_view(request: HttpRequest) -> JsonResponse:
 def project_report_data_view(request: HttpRequest) -> JsonResponse:
     year = _parse_year(request.GET.get("year"))
     quarters = _parse_quarters(request.GET.getlist("quarters") or request.GET.get("quarters"))
+    project_status = _parse_project_status(request.GET.get("project_status"))
 
     if year is None:
         return JsonResponse(
@@ -520,12 +556,13 @@ def project_report_data_view(request: HttpRequest) -> JsonResponse:
             status=400,
         )
 
-    rows, months = _project_report_rows(year, quarters)
+    rows, months = _project_report_rows(year, quarters, project_status)
     return JsonResponse(
         {
             "status": "ok",
             "year": year,
             "quarters": quarters,
+            "project_status": project_status,
             "months": months,
             "opr_project_found": _find_opr_project_id() is not None,
             "rows": rows,

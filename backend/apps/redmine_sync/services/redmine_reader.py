@@ -76,6 +76,7 @@ class RedmineReader:
         SELECT
             p.id AS redmine_project_id,
             p.name,
+            p.status,
             cv_number.value AS project_number,
             p.parent_id AS parent_redmine_project_id,
             p.created_on AS redmine_created_on,

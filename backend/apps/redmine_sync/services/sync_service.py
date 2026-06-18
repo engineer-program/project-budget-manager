@@ -274,6 +274,7 @@ class SyncService:
         for item in payload:
             defaults = {
                 "name": self._normalize_project_name(item.get("name")),
+                "status": self._safe_int(item.get("status")) or 1,
                 "project_number": item.get("project_number") or "",
                 "name_1s": item.get("name_1s") or "",
                 "name_sanda": item.get("name_sanda") or "",
@@ -316,6 +317,7 @@ class SyncService:
                     projects_to_update,
                     [
                         "name",
+                        "status",
                         "project_number",
                         "name_1s",
                         "name_sanda",
