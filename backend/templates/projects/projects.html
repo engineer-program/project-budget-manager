@@ -41,7 +41,7 @@
         }
 
         .page {
-            max-width: 1500px;
+            max-width: 95%;
             margin: 0 auto;
             padding: 28px 24px 40px;
             position: relative;
@@ -133,6 +133,10 @@
             margin: 0 0 28px;
             font-size: 2rem;
             line-height: 1.15;
+        }
+
+        #projects-table .strong-border-right {
+            border-right: 2px solid #9aa8b2;
         }
 
         .status-message {
@@ -418,7 +422,7 @@
                 <div class="field">
                     <label for="budget-value">Стартовый бюджет</label>
                     <div class="money-input-wrap">
-                        <input id="budget-value" type="number" step="0.01">
+                        <input id="budget-value" type="text" inputmode="decimal">
                     </div>
                 </div>
                 <button class="button primary" type="button" id="save-budget-button">Сохранить</button>
@@ -440,7 +444,7 @@
                 <div class="field">
                     <label for="income-amount">Сумма</label>
                     <div class="money-input-wrap">
-                        <input id="income-amount" type="number" step="0.01">
+                        <input id="income-amount" type="text" inputmode="decimal">
                     </div>
                 </div>
                 <div class="field">
@@ -471,7 +475,7 @@
                 <div class="field">
                     <label for="expense-amount">Сумма</label>
                     <div class="money-input-wrap">
-                        <input id="expense-amount" type="number" step="0.01">
+                        <input id="expense-amount" type="text" inputmode="decimal">
                     </div>
                 </div>
                 <div class="field">
@@ -553,7 +557,7 @@
         }
 
         function formatMoney(value) {
-            return `${normalizeMoney(value)}₽`;
+            return `${normalizeMoney(value)} ₽`;
         }
 
         function openModal(backdrop) {
@@ -602,7 +606,7 @@
                 projectsTable = new Tabulator("#projects-table", {
                     data: payload.rows,
                     index: "id",
-                    layout: "fitDataStretch",
+                    layout: "fitColumns",
                     height: "680px",
                     movableColumns: true,
                     dataTree: true,
@@ -613,12 +617,12 @@
                     },
                     columns: [
                         {title: "Номер проекта", field: "project_number", width: 280, frozen: true, headerFilter: "input", formatter: linkFormatter, cellClick: (_, cell) => openProjectCard(cell.getRow().getData().id)},
-                        {title: "Наименование в 1С", field: "name_1s", width: 220, headerFilter: "input"},
-                        {title: "Имя проекта", field: "name", width: 250, headerFilter: "input"},
+                        {title: "Наименование в 1С", field: "name_1s", width: 180, headerFilter: "input"},
+                        {title: "Имя проекта", field: "name", width: 250, headerFilter: "input", cssClass: "strong-border-right"},
                         moneyColumn("Стартовый бюджет", "start_budget"),
                         moneyColumn("Бюджет на сегодня", "budget_today"),
-                        {title: "Суммарные доходы", field: "total_income", widthGrow: 1, maxWidth: 130, hozAlign: "right", sorter: "number", formatter: linkMoneyFormatter, cellClick: (_, cell) => openProjectIncomes(cell.getRow().getData().id)},
-                        moneyColumn("Суммарные расходы", "total_expense"),
+                        {title: "Суммарные доходы", field: "total_income", widthGrow: 1, minWidth: 130, hozAlign: "right", sorter: "number", formatter: linkMoneyFormatter, cellClick: (_, cell) => openProjectIncomes(cell.getRow().getData().id)},
+                        moneyColumn("Суммарные расходы", "total_expense", widthGrow = 1.05),
                     ],
                 });
             } catch (error) {
@@ -626,15 +630,15 @@
             }
         }
 
-        function moneyColumn(title, field) {
+        function moneyColumn(title, field, widthGrow = 1) {
             return {
                 title,
                 field,
                 hozAlign: "right",
                 sorter: "number",
                 formatter: (cell) => formatMoney(cell.getValue()),
-                maxWidth: 130,
-                widthGrow: 1,
+                minWidth: 120,
+                widthGrow: widthGrow,
             };
         }
 

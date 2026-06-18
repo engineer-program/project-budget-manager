@@ -40,7 +40,7 @@
         }
 
         .page {
-            max-width: 1500px;
+            max-width: 95%;/*1500px;*/
             margin: 0 auto;
             padding: 28px 24px 40px;
             position: relative;
@@ -214,6 +214,19 @@
             overflow: hidden;
         }
 
+        #project-report-table .strong-border-left {
+            border-left: 2px solid #9aa8b2;
+        }
+
+        #project-report-table .strong-border-right {
+            border-right: 2px solid #9aa8b2;
+        }
+
+        #project-report-table .strong-border-both {
+            border-left: 2px solid #9aa8b2;
+            border-right: 2px solid #9aa8b2;
+        }
+
         .tabulator {
             background: transparent;
             border: 0;
@@ -344,7 +357,7 @@
         }
 
         function formatMoney(value) {
-            return `${normalizeMoney(value)}₽`;
+            return `${normalizeMoney(value)} ₽`;
         }
 
         function getReportParams() {
@@ -355,24 +368,30 @@
             return params;
         }
 
-        function moneyColumn(title, field, width = 130) {
-            return {
+        function moneyColumn(title, field, cssClass = "", width = 125) {
+            const column = {
                 title,
                 field,
                 hozAlign: "right",
                 sorter: "number",
                 formatter: (cell) => formatMoney(cell.getValue()),
-                minWidth: width,
-                width,
+                minWidth: 125,
+                width: width,
             };
+
+            if (cssClass) {
+                column.cssClass = cssClass;
+            }
+
+            return column;
         }
 
         function buildColumns(months) {
             const columns = [
-                {title: "Номер проекта", field: "project_number", frozen: true, width: 200, headerFilter: "input"},
-                {title: "Наименование в 1С", field: "name_1s", frozen: true, width: 200, headerFilter: "input"},
-                {title: "Наименование проекта", field: "name", frozen: true, width: 250, headerFilter: "input"},
-                moneyColumn("Стартовый бюджет", "start_budget"),
+                {title: "Номер проекта", field: "project_number", frozen: true, width: 280, headerFilter: "input",},
+                {title: "Наименование в 1С", field: "name_1s", frozen: true, width: 180, headerFilter: "input"},
+                {title: "Наименование проекта", field: "name", frozen: true, width: 250, headerFilter: "input",},
+                moneyColumn("Стартовый бюджет", "start_budget", "strong-border-both"),
             ];
 
             months.forEach((month) => {
@@ -380,8 +399,9 @@
                 columns.push({
                     title: month.title,
                     hozAlign: "center",
+                    headerCssClass: "strong-border-both",
                     columns: [
-                        moneyColumn("Бюджет на начало месяца", `${prefix}_budget_start`),
+                        moneyColumn("Бюджет на начало месяца", `${prefix}_budget_start`, "strong-border-left"),
                         moneyColumn("Доходы", `${prefix}_income`),
                         moneyColumn("Расходы на З/П", `${prefix}_base_salary_expense`),
                         moneyColumn("Расходы на доп. З/П", `${prefix}_extra_salary_expense`),
@@ -395,8 +415,8 @@
                 });
             });
 
-            columns.push(moneyColumn("Доходы за период", "period_income"));
-            columns.push(moneyColumn("Расходы за период", "period_expense"));
+            columns.push(moneyColumn("Доходы за период", "period_income", "strong-border-left"));
+            columns.push(moneyColumn("Расходы за период", "period_expense", "strong-border-right"));
             return columns;
         }
 

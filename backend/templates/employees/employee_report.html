@@ -40,7 +40,7 @@
         }
 
         .page {
-            max-width: 1500px;
+            max-width: 95%;/*1500px;*/
             margin: 0 auto;
             padding: 28px 24px 40px;
             position: relative;
@@ -271,6 +271,15 @@
             overflow: hidden;
         }
 
+        #employee-report-table .strong-border-left {
+            border-left: 2px solid #9aa8b2;
+        }
+
+        #employee-report-table .strong-border-both {
+            border-left: 2px solid #9aa8b2;
+            border-right: 2px solid #9aa8b2;
+        }
+
         .tabulator {
             background: transparent;
             border: 0;
@@ -424,7 +433,7 @@
         }
 
         function formatMoney(value) {
-            return `${normalizeMoney(value)}₽`;
+            return `${normalizeMoney(value)} ₽`;
         }
 
         function updateGroupsToggleText() {
@@ -448,16 +457,22 @@
             return params;
         }
 
-        function moneyColumn(title, field) {
-            return {
+        function moneyColumn(title, field, cssClass = "") {
+            const column = {
                 title,
                 field,
                 hozAlign: "right",
                 sorter: "number",
                 formatter: (cell) => formatMoney(cell.getValue()),
-                minWidth: 100,
+                minWidth: 110,
                 maxWidth: 130,
             };
+
+            if (cssClass) {
+                column.cssClass = cssClass;
+            }
+
+            return column;
         }
 
         function buildColumns(months) {
@@ -470,8 +485,9 @@
                 columns.push({
                     title: month.title,
                     hozAlign: "center",
+                    headerCssClass: "strong-border-left",
                     columns: [
-                        moneyColumn("З/П", `month_${month.month}_base_salary`),
+                        moneyColumn("З/П", `month_${month.month}_base_salary`, "strong-border-left"),
                         moneyColumn("Доп. З/П", `month_${month.month}_extra_salary`),
                         moneyColumn("Премия кв.", `month_${month.month}_bonus`),
                         moneyColumn("Доп. премия", `month_${month.month}_extra_bonus`),
@@ -482,7 +498,7 @@
                 });
             });
 
-            columns.push(moneyColumn("Среднее за период", "average_income"));
+            columns.push(moneyColumn("Среднее за период", "average_income", "strong-border-both"));
             return columns;
         }
 

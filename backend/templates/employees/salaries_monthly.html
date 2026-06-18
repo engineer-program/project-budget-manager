@@ -40,7 +40,7 @@
         }
 
         .page {
-            max-width: 1500px;
+            max-width: 95%;
             margin: 0 auto;
             padding: 28px 24px 40px;
             position: relative;
@@ -275,6 +275,24 @@
             font-size: 0.82rem;
         }
 
+        .money-input-wrap {
+            position: relative;
+        }
+
+        .money-input-wrap input {
+            padding-right: 60px;
+        }
+
+        .money-input-wrap::after {
+            content: "₽";
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+
         .status-message {
             display: none;
             position: fixed;
@@ -319,6 +337,7 @@
             border: 1px solid rgba(33, 49, 61, 0.08);
             border-radius: 8px;
             overflow: hidden;
+            width: 100%;
         }
 
         .tabulator {
@@ -584,7 +603,10 @@
             <div class="modal-form">
                 <div class="field">
                     <label id="bonus-amount-label" for="bonus-amount">Сумма</label>
-                    <input id="bonus-amount" type="number" step="0.01">
+                    <div class="money-input-wrap">
+                        <input id="bonus-amount" type="text" inputmode="decimal">
+                        <!-- type="number"> -->
+                    </div>
                 </div>
                 <div class="field">
                     <label for="bonus-quarter">Квартал премии</label>
@@ -877,7 +899,7 @@
         }
 
         function formatMoney(value) {
-            return `${normalizeMoney(value)}₽`;
+            return `${normalizeMoney(value)} ₽`;
         }
 
         function quarterTitle(value) {
@@ -929,7 +951,8 @@
             mutatorEdit: normalizeMoney,
             formatter: (cell) => formatMoney(cell.getValue()),
             cellEdited: markRowDirty,
-            minWidth: 100
+            minWidth: 110,
+            widthGrow: 1
         });
 
         const bonusColumn = (title, field) => ({
@@ -939,6 +962,8 @@
             sorter: "number",
             formatter: formatBonusCell,
             cellClick: (_, cell) => openBonusModal(cell, field, title),
+            minWidth: 110,
+            widthGrow: 1
         });
 
         function openBonusModal(cell, field, title) {
@@ -1362,7 +1387,7 @@
             table = new Tabulator("#salary-table", {
                 data: rows,
                 index: "employee_id",
-                layout: "fitDataStretch",
+                layout: "fitColumns",
                 height: "650px",
                 movableColumns: true,
                 columnDefaults: {
