@@ -955,7 +955,7 @@
             widthGrow: 1
         });
 
-        const bonusColumn = (title, field) => ({
+        const bonusColumn = (title, field, widthGrow = 1) => ({
             title,
             field,
             hozAlign: "right",
@@ -963,7 +963,7 @@
             formatter: formatBonusCell,
             cellClick: (_, cell) => openBonusModal(cell, field, title),
             minWidth: 110,
-            widthGrow: 1
+            widthGrow: widthGrow
         });
 
         function openBonusModal(cell, field, title) {
@@ -1400,8 +1400,8 @@
                     {title: "Должность", field: "position", frozen: true, width: 80},
                     moneyColumn("З/П", "base_salary"),
                     moneyColumn("Доп. З/П", "extra_salary"),
-                    bonusColumn("Премия кв.", "bonus"),
-                    bonusColumn("Доп. премия", "extra_bonus"),
+                    bonusColumn("Премия кв.", "bonus", 1.1),
+                    bonusColumn("Доп. премия", "extra_bonus", 1.1),
                     moneyColumn("Отпускные", "vacation"),
                     moneyColumn("Больничные", "sick_leave"),
                     moneyColumn("Командировочные", "business_trip"),
