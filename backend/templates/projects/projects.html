@@ -59,10 +59,18 @@
         .topbar,
         .topbar-actions,
         .modal-actions,
-        .form-grid {
+        .form-grid,
+        .project-filters {
             display: flex;
             align-items: center;
             gap: 12px;
+        }
+
+        .project-filters {
+            justify-content: center;
+            flex-wrap: flex-center;
+            margin-bottom: 22px;
+            width: 500px;
         }
 
         .topbar {
@@ -327,6 +335,7 @@
         }
 
         .field input,
+        .field select,
         .field textarea {
             width: 100%;
             border: 1px solid var(--input-border);
@@ -380,6 +389,20 @@
         <section class="panel">
             <h1 class="heading">Проекты</h1>
             <div id="status-message" class="status-message"></div>
+            <div class="project-filters">
+                <div class="field">
+                    <label for="project-status-filter">Статус проекта</label>
+                    <select id="project-status-filter">
+                        <option value="open" selected>Открыт</option>
+                        <option value="closed">Закрыт</option>
+                        <option value="archived">Архивирован</option>
+                        <option value="all">Все</option>
+                    </select>
+                </div>
+                <button id="refresh-projects-button" class="button primary" type="button" disabled>
+                    Обновить список проектов
+                </button>
+            </div>
             <div id="projects-table"></div>
         </section>
     </div>
@@ -513,8 +536,12 @@
         let currentProject = null;
         let pendingIncomeDeleteId = null;
         let statusTimer = null;
+        let loadedProjectStatus = "open";
 
         const statusMessage = document.getElementById("status-message");
+        const projectsTableElement = document.getElementById("projects-table");
+        const projectStatusFilter = document.getElementById("project-status-filter");
+        const refreshProjectsButton = document.getElementById("refresh-projects-button");
         const toastContainer = document.getElementById("toast-container");
         const projectCardBackdrop = document.getElementById("project-card-backdrop");
         const incomesBackdrop = document.getElementById("incomes-backdrop");
@@ -595,11 +622,29 @@
             return payload;
         }
 
+        function updateRefreshProjectsButton() {
+            const statusChanged = projectStatusFilter.value !== loadedProjectStatus;
+            refreshProjectsButton.disabled = !statusChanged && Boolean(projectsTable);
+            if (statusChanged) {
+                projectsTableElement.style.display = "none";
+            }
+        }
+
         async function loadProjects() {
+            const defaultButtonText = "Обновить список проектов";
+            refreshProjectsButton.disabled = true;
+            refreshProjectsButton.textContent = "Загрузка...";
+            showStatus("Загружаем список проектов...", "success");
             try {
-                const payload = await requestJson("{% url 'projects-data' %}");
+                const params = new URLSearchParams({project_status: projectStatusFilter.value});
+                const payload = await requestJson(`{% url 'projects-data' %}?${params}`);
+                loadedProjectStatus = payload.project_status || projectStatusFilter.value;
+                projectStatusFilter.value = loadedProjectStatus;
+                projectsTableElement.style.display = "";
+                updateRefreshProjectsButton();
                 if (projectsTable) {
                     projectsTable.replaceData(payload.rows);
+                    showStatus("Список проектов обновлён.", "success");
                     return;
                 }
 
@@ -625,8 +670,12 @@
                         moneyColumn("Суммарные расходы", "total_expense", widthGrow = 1.05),
                     ],
                 });
+                showStatus("Список проектов загружен.", "success");
             } catch (error) {
                 showStatus(error.message, "error");
+            } finally {
+                refreshProjectsButton.textContent = defaultButtonText;
+                updateRefreshProjectsButton();
             }
         }
 
@@ -826,6 +875,8 @@
         document.getElementById("save-income-button").addEventListener("click", saveIncome);
         document.getElementById("save-expense-button").addEventListener("click", saveExpense);
         document.getElementById("confirm-delete-income-button").addEventListener("click", deleteIncome);
+        projectStatusFilter.addEventListener("change", updateRefreshProjectsButton);
+        refreshProjectsButton.addEventListener("click", loadProjects);
 
         loadProjects();
     </script>

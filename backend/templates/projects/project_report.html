@@ -307,6 +307,16 @@
                     </div>
                 </div>
 
+                <div class="field">
+                    <label for="project-status-filter">Статус проекта</label>
+                    <select id="project-status-filter">
+                        <option value="open" selected>Открыт</option>
+                        <option value="closed">Закрыт</option>
+                        <option value="archived">Архивирован</option>
+                        <option value="all">Все</option>
+                    </select>
+                </div>
+
                 <button id="load-table-button" class="button primary" type="button">
                     Отобразить отчёт по проектам
                 </button>
@@ -322,11 +332,13 @@
     <script>
         const yearSelect = document.getElementById("year-filter");
         const quarterInputs = Array.from(document.querySelectorAll(".quarter-option input"));
+        const projectStatusFilter = document.getElementById("project-status-filter");
         const loadButton = document.getElementById("load-table-button");
         const tablePanel = document.getElementById("table-panel");
         const statusMessage = document.getElementById("status-message");
         let table = null;
         let statusTimer = null;
+        let loadedProjectStatus = "open";
 
         function showStatus(message, type) {
             if (statusTimer) {
@@ -361,7 +373,10 @@
         }
 
         function getReportParams() {
-            const params = new URLSearchParams({year: yearSelect.value});
+            const params = new URLSearchParams({
+                year: yearSelect.value,
+                project_status: projectStatusFilter.value,
+            });
             quarterInputs
                 .filter((input) => input.checked)
                 .forEach((input) => params.append("quarters", input.value));
@@ -458,6 +473,8 @@
                 }
 
                 tablePanel.classList.add("visible");
+                loadedProjectStatus = payload.project_status || projectStatusFilter.value;
+                projectStatusFilter.value = loadedProjectStatus;
                 buildTable(payload.rows, payload.months);
                 if (payload.opr_project_found) {
                     showStatus("Отчёт по проектам загружен.", "success");
@@ -474,6 +491,7 @@
 
         loadButton.addEventListener("click", loadReport);
         yearSelect.addEventListener("change", resetVisibleTable);
+        projectStatusFilter.addEventListener("change", resetVisibleTable);
         quarterInputs.forEach((input) => input.addEventListener("change", resetVisibleTable));
     </script>
 </body>
