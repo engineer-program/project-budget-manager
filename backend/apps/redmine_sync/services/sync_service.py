@@ -38,6 +38,7 @@ class SyncService:
     TIME_ENTRIES_MODE_FULL = "full"
     DEFAULT_CHUNK_SIZE = 5000
     DEFAULT_WINDOW_DAYS = 365
+    DEFAULT_INCREMENTAL_RECONCILE_DAYS = 30
     PROJECT_TIMESTAMP_PREFIX_RE = re.compile(
         r"^'?\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}\s+(?P<name>.+)$"
     )
@@ -86,6 +87,7 @@ class SyncService:
     def sync_employees(self) -> SyncStats:
         stats = SyncStats()
         payload = self.reader.fetch_employees()
+        now = timezone.now()
 
         redmine_ids = [item["redmine_id"] for item in payload]
         existing_by_redmine_id = Employee.objects.in_bulk(redmine_ids, field_name="redmine_id")
@@ -103,6 +105,8 @@ class SyncService:
                 "dismissal_date": self._normalize_date(item.get("dismissal_date")),
                 "email": item.get("email") or "",
                 "active": bool(item.get("active")),
+                "synced_at": now,
+                "is_deleted_in_redmine": False,
             }
             employee = existing_by_redmine_id.get(item["redmine_id"])
             if employee is None:
@@ -132,12 +136,21 @@ class SyncService:
                         "dismissal_date",
                         "email",
                         "active",
+                        "synced_at",
+                        "is_deleted_in_redmine",
                     ],
                     batch_size=500,
                 )
 
+            deleted_count = Employee.objects.exclude(redmine_id__in=redmine_ids).filter(
+                is_deleted_in_redmine=False,
+            ).update(
+                is_deleted_in_redmine=True,
+                synced_at=now,
+            )
+
         stats.created = len(employees_to_create)
-        stats.updated = len(employees_to_update)
+        stats.updated = len(employees_to_update) + deleted_count
         self._mark_state("employees", "success", stats)
         return stats
 
@@ -261,6 +274,7 @@ class SyncService:
         for item in payload:
             defaults = {
                 "name": self._normalize_project_name(item.get("name")),
+                "status": self._safe_int(item.get("status")) or 1,
                 "project_number": item.get("project_number") or "",
                 "name_1s": item.get("name_1s") or "",
                 "name_sanda": item.get("name_sanda") or "",
@@ -268,6 +282,7 @@ class SyncService:
                 "redmine_created_on": self._normalize_datetime(item.get("redmine_created_on")),
                 "redmine_updated_on": self._normalize_datetime(item.get("redmine_updated_on")),
                 "synced_at": now,
+                "is_deleted_in_redmine": False,
             }
             redmine_project_id = item["redmine_project_id"]
             relation_links.append(
@@ -302,6 +317,7 @@ class SyncService:
                     projects_to_update,
                     [
                         "name",
+                        "status",
                         "project_number",
                         "name_1s",
                         "name_sanda",
@@ -309,10 +325,19 @@ class SyncService:
                         "redmine_created_on",
                         "redmine_updated_on",
                         "synced_at",
+                        "is_deleted_in_redmine",
                         "updated_at",
                     ],
                     batch_size=500,
                 )
+
+            deleted_count = Project.objects.exclude(redmine_project_id__in=redmine_project_ids).filter(
+                is_deleted_in_redmine=False,
+            ).update(
+                is_deleted_in_redmine=True,
+                synced_at=now,
+                updated_at=now,
+            )
 
         project_map = Project.objects.in_bulk(redmine_project_ids, field_name="redmine_project_id")
         employee_ids = {
@@ -361,7 +386,7 @@ class SyncService:
         }
 
         stats.created = len(projects_to_create)
-        stats.updated = len(updated_project_ids)
+        stats.updated = len(updated_project_ids) + deleted_count
         self._mark_state("projects", "success", stats)
         return stats
 
@@ -416,7 +441,54 @@ class SyncService:
             stats,
             cursor_int=after_id if mode == self.TIME_ENTRIES_MODE_INCREMENTAL else None,
         )
+        deleted_count = 0
+        if mode == self.TIME_ENTRIES_MODE_FULL:
+            deleted_count = self._reconcile_deleted_time_entries_full()
+        elif mode == self.TIME_ENTRIES_MODE_WINDOW:
+            reconcile_start = date.today() - timedelta(days=window_days)
+            deleted_count = self._reconcile_deleted_time_entries_by_spent_on(start_date=reconcile_start)
+        elif mode == self.TIME_ENTRIES_MODE_INCREMENTAL:
+            reconcile_start = date.today() - timedelta(days=self.DEFAULT_INCREMENTAL_RECONCILE_DAYS)
+            deleted_count = self._reconcile_deleted_time_entries_by_spent_on(start_date=reconcile_start)
+
+        if deleted_count:
+            stats.updated += deleted_count
+            self._mark_state(
+                state_code,
+                "success",
+                stats,
+                cursor_int=after_id if mode == self.TIME_ENTRIES_MODE_INCREMENTAL else None,
+            )
         return stats
+
+    def _reconcile_deleted_time_entries_full(self) -> int:
+        redmine_ids = set(self.reader.fetch_time_entry_ids())
+        return (
+            RedmineTimeEntry.objects.exclude(redmine_time_entry_id__in=redmine_ids)
+            .filter(is_deleted_in_redmine=False)
+            .update(is_deleted_in_redmine=True)
+        )
+
+    def _reconcile_deleted_time_entries_by_spent_on(
+        self,
+        *,
+        start_date: date,
+        end_date: date | None = None,
+    ) -> int:
+        redmine_ids = set(
+            self.reader.fetch_time_entry_ids_by_spent_on(
+                start_date=start_date,
+                end_date=end_date,
+            )
+        )
+        queryset = RedmineTimeEntry.objects.filter(
+            spent_on__gte=start_date,
+            is_deleted_in_redmine=False,
+        )
+        if end_date is not None:
+            queryset = queryset.filter(spent_on__lte=end_date)
+
+        return queryset.exclude(redmine_time_entry_id__in=redmine_ids).update(is_deleted_in_redmine=True)
 
     def _sync_time_entries_chunk(self, payload: list[dict[str, object]]) -> SyncStats:
         stats = SyncStats()
@@ -437,8 +509,16 @@ class SyncService:
             redmine_time_entry_ids,
             field_name="redmine_time_entry_id",
         )
-        project_map = Project.objects.in_bulk(project_ids, field_name="redmine_project_id") if project_ids else {}
-        employee_map = Employee.objects.in_bulk(employee_ids, field_name="redmine_id") if employee_ids else {}
+        project_map = (
+            Project.objects.filter(is_deleted_in_redmine=False).in_bulk(project_ids, field_name="redmine_project_id")
+            if project_ids
+            else {}
+        )
+        employee_map = (
+            Employee.objects.filter(is_deleted_in_redmine=False).in_bulk(employee_ids, field_name="redmine_id")
+            if employee_ids
+            else {}
+        )
 
         time_entries_to_create: list[RedmineTimeEntry] = []
         time_entries_to_update: list[RedmineTimeEntry] = []
@@ -456,6 +536,7 @@ class SyncService:
             activity_id = item.get("activity_id")
             spent_on = item["spent_on"]
             created_at = self._normalize_datetime(item.get("created_at"))
+            redmine_updated_on = self._normalize_datetime(item.get("updated_at"))
 
             time_entry = existing_by_redmine_id.get(item["redmine_time_entry_id"])
             if time_entry is None:
@@ -469,6 +550,8 @@ class SyncService:
                         activity_id=activity_id,
                         spent_on=spent_on,
                         created_at=created_at,
+                        redmine_updated_on=redmine_updated_on,
+                        is_deleted_in_redmine=False,
                     )
                 )
                 continue
@@ -495,6 +578,12 @@ class SyncService:
             if time_entry.created_at != created_at:
                 time_entry.created_at = created_at
                 changed = True
+            if time_entry.redmine_updated_on != redmine_updated_on:
+                time_entry.redmine_updated_on = redmine_updated_on
+                changed = True
+            if time_entry.is_deleted_in_redmine:
+                time_entry.is_deleted_in_redmine = False
+                changed = True
 
             if changed:
                 time_entries_to_update.append(time_entry)
@@ -505,7 +594,17 @@ class SyncService:
             if time_entries_to_update:
                 RedmineTimeEntry.objects.bulk_update(
                     time_entries_to_update,
-                    ["project_id", "user_id", "issue_id", "hours", "activity_id", "spent_on", "created_at"],
+                    [
+                        "project_id",
+                        "user_id",
+                        "issue_id",
+                        "hours",
+                        "activity_id",
+                        "spent_on",
+                        "created_at",
+                        "redmine_updated_on",
+                        "is_deleted_in_redmine",
+                    ],
                     batch_size=1000,
                 )
 
@@ -525,6 +624,8 @@ class SyncService:
                 "dismissal_date": None,
                 "email": "",
                 "active": False,
+                "synced_at": timezone.now(),
+                "is_deleted_in_redmine": False,
             },
         )
 

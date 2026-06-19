@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Отчёт по сотрудникам | Бюджетирование проектов ТКЗ</title>
+    <title>Отчёт по проектам | Бюджетирование проектов ТКЗ</title>
     <link rel="icon" href="{% static 'images/company_logo.ico' %}" type="image/x-icon">
     <link rel="stylesheet" href="{% static 'vendor/tabulator/tabulator.min.css' %}">
     <style>
@@ -58,8 +58,7 @@
         .topbar,
         .topbar-actions,
         .filters,
-        .quarter-options,
-        .table-actions {
+        .quarter-options {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
@@ -143,14 +142,6 @@
             position: relative;
         }
 
-        .field.groups-field {
-            min-width: 360px;
-        }
-
-        .status-filter-field {
-            min-width: 220px;
-        }
-
         .field label,
         .field-title {
             display: block;
@@ -169,8 +160,7 @@
             color: var(--text-main);
         }
 
-        .quarter-option,
-        .group-checkbox {
+        .quarter-option {
             display: flex;
             align-items: flex-start;
             gap: 8px;
@@ -183,60 +173,13 @@
             min-height: 44px;
         }
 
-        .groups-toggle {
-            width: 100%;
-            justify-content: space-between;
-        }
-
-        .groups-toggle::after {
-            content: "▼";
-            margin-left: 10px;
-            font-size: 0.72rem;
-        }
-
-        .groups-toggle.open::after {
-            content: "▲";
-        }
-
-        .groups-checkboxes {
-            display: none;
-            position: absolute;
-            top: 74px;
-            left: 0;
-            width: 100%;
-            z-index: 30;
-            gap: 8px;
-            max-height: 180px;
-            overflow: auto;
-            border: 1px solid var(--input-border);
-            border-radius: 10px;
-            padding: 10px 12px;
-            background: #fff;
-            box-shadow: 0 18px 42px rgba(33, 49, 61, 0.18);
-        }
-
-        .groups-checkboxes.visible {
-            display: grid;
-        }
-
-        .groups-placeholder,
-        .field-hint {
-            color: var(--text-muted);
-            font-size: 0.86rem;
-        }
-
-        .field-hint {
-            display: block;
-            margin-top: 6px;
-        }
-
         .status-message {
             display: none;
             position: fixed;
             top: 24px;
             right: 24px;
             z-index: 80;
-            width: min(420px, calc(100vw - 32px));
+            width: min(460px, calc(100vw - 32px));
             border-radius: 10px;
             padding: 12px 14px;
             font-size: 0.95rem;
@@ -265,17 +208,21 @@
             display: block;
         }
 
-        #employee-report-table {
+        #project-report-table {
             border: 1px solid rgba(33, 49, 61, 0.08);
             border-radius: 8px;
             overflow: hidden;
         }
 
-        #employee-report-table .strong-border-left {
+        #project-report-table .strong-border-left {
             border-left: 2px solid #9aa8b2;
         }
 
-        #employee-report-table .strong-border-both {
+        #project-report-table .strong-border-right {
+            border-right: 2px solid #9aa8b2;
+        }
+
+        #project-report-table .strong-border-both {
             border-left: 2px solid #9aa8b2;
             border-right: 2px solid #9aa8b2;
         }
@@ -283,7 +230,7 @@
         .tabulator {
             background: transparent;
             border: 0;
-            font-size: 0.92rem;
+            font-size: 0.88rem;
         }
 
         .tabulator .tabulator-header,
@@ -337,7 +284,7 @@
         </div>
 
         <section class="panel">
-            <h1 class="heading">Отчёт по сотрудникам</h1>
+            <h1 class="heading">Отчёт по проектам</h1>
             <div id="status-message" class="status-message"></div>
 
             <div class="filters">
@@ -360,34 +307,24 @@
                     </div>
                 </div>
 
-                <div class="field status-filter-field">
-                    <label for="status-filter">Статус</label>
-                    <select id="status-filter">
-                        <option value="1" selected>Активен</option>
-                        <option value="0">Заблокирован</option>
+                <div class="field">
+                    <label for="project-status-filter">Статус проекта</label>
+                    <select id="project-status-filter">
+                        <option value="open" selected>Открыт</option>
+                        <option value="closed">Закрыт</option>
+                        <option value="archived">Архивирован</option>
                         <option value="all">Все</option>
                     </select>
                 </div>
 
-                <div class="field groups-field">
-                    <label>Группы сотрудников</label>
-                    <button id="groups-toggle" class="button groups-toggle" type="button">
-                        Выбрать группы
-                    </button>
-                    <div id="group-filter" class="groups-checkboxes">
-                        <span class="groups-placeholder">Загрузка групп...</span>
-                    </div>
-                    <span class="field-hint">Можно выбрать несколько групп</span>
-                </div>
-
                 <button id="load-table-button" class="button primary" type="button">
-                    Получить список пользователей
+                    Отобразить отчёт по проектам
                 </button>
             </div>
         </section>
 
         <section id="table-panel" class="panel table-panel">
-            <div id="employee-report-table"></div>
+            <div id="project-report-table"></div>
         </section>
     </div>
 
@@ -395,14 +332,13 @@
     <script>
         const yearSelect = document.getElementById("year-filter");
         const quarterInputs = Array.from(document.querySelectorAll(".quarter-option input"));
-        const statusFilter = document.getElementById("status-filter");
-        const groupsToggle = document.getElementById("groups-toggle");
-        const groupFilter = document.getElementById("group-filter");
+        const projectStatusFilter = document.getElementById("project-status-filter");
         const loadButton = document.getElementById("load-table-button");
         const tablePanel = document.getElementById("table-panel");
         const statusMessage = document.getElementById("status-message");
         let table = null;
         let statusTimer = null;
+        let loadedProjectStatus = "open";
 
         function showStatus(message, type) {
             if (statusTimer) {
@@ -436,36 +372,26 @@
             return `${normalizeMoney(value)} ₽`;
         }
 
-        function updateGroupsToggleText() {
-            const selectedCount = groupFilter.querySelectorAll("input[type='checkbox']:checked").length;
-            groupsToggle.textContent = selectedCount === 0
-                ? "Выбрать группы"
-                : `Выбрано групп: ${selectedCount}`;
-        }
-
         function getReportParams() {
             const params = new URLSearchParams({
                 year: yearSelect.value,
-                active: statusFilter.value,
+                project_status: projectStatusFilter.value,
             });
             quarterInputs
                 .filter((input) => input.checked)
                 .forEach((input) => params.append("quarters", input.value));
-            groupFilter
-                .querySelectorAll("input[type='checkbox']:checked")
-                .forEach((checkbox) => params.append("group_ids", checkbox.value));
             return params;
         }
 
-        function moneyColumn(title, field, cssClass = "") {
+        function moneyColumn(title, field, cssClass = "", width = 125) {
             const column = {
                 title,
                 field,
                 hozAlign: "right",
                 sorter: "number",
                 formatter: (cell) => formatMoney(cell.getValue()),
-                minWidth: 110,
-                maxWidth: 130,
+                minWidth: 125,
+                width: width,
             };
 
             if (cssClass) {
@@ -477,28 +403,35 @@
 
         function buildColumns(months) {
             const columns = [
-                {title: "ФИО сотрудника", field: "full_name", frozen: true, width: 280, headerFilter: "input"},
-                {title: "Должность", field: "position", frozen: true, width: 80, headerFilter: "input"},
+                {title: "Номер проекта", field: "project_number", frozen: true, width: 280, headerFilter: "input",},
+                {title: "Наименование в 1С", field: "name_1s", frozen: true, width: 180, headerFilter: "input"},
+                {title: "Наименование проекта", field: "name", frozen: true, width: 250, headerFilter: "input",},
+                moneyColumn("Стартовый бюджет", "start_budget", "strong-border-both"),
             ];
 
             months.forEach((month) => {
+                const prefix = `month_${month.key}`;
                 columns.push({
                     title: month.title,
                     hozAlign: "center",
-                    headerCssClass: "strong-border-left",
+                    headerCssClass: "strong-border-both",
                     columns: [
-                        moneyColumn("З/П", `month_${month.month}_base_salary`, "strong-border-left"),
-                        moneyColumn("Доп. З/П", `month_${month.month}_extra_salary`),
-                        moneyColumn("Премия кв.", `month_${month.month}_bonus`),
-                        moneyColumn("Доп. премия", `month_${month.month}_extra_bonus`),
-                        moneyColumn("Отпускные", `month_${month.month}_vacation`),
-                        moneyColumn("Больничные", `month_${month.month}_sick_leave`),
-                        moneyColumn("Командировочные", `month_${month.month}_business_trip`),
+                        moneyColumn("Бюджет на начало месяца", `${prefix}_budget_start`, "strong-border-left"),
+                        moneyColumn("Доходы", `${prefix}_income`),
+                        moneyColumn("Расходы на З/П", `${prefix}_base_salary_expense`),
+                        moneyColumn("Расходы на доп. З/П", `${prefix}_extra_salary_expense`),
+                        moneyColumn("Расходы на премию кв.", `${prefix}_bonus_expense`),
+                        moneyColumn("Расходы на доп. премию", `${prefix}_extra_bonus_expense`),
+                        moneyColumn("Расходы на отпускные", `${prefix}_vacation_expense`),
+                        moneyColumn("Расходы на больничные", `${prefix}_sick_leave_expense`),
+                        moneyColumn("Расходы на командировочные", `${prefix}_business_trip_expense`),
+                        moneyColumn("Иные расходы", `${prefix}_other_expense`),
                     ],
                 });
             });
 
-            columns.push(moneyColumn("Среднее за период", "average_income", "strong-border-both"));
+            columns.push(moneyColumn("Доходы за период", "period_income", "strong-border-left"));
+            columns.push(moneyColumn("Расходы за период", "period_expense", "strong-border-right"));
             return columns;
         }
 
@@ -510,12 +443,14 @@
                 return;
             }
 
-            table = new Tabulator("#employee-report-table", {
+            table = new Tabulator("#project-report-table", {
                 data: rows,
-                index: "employee_id",
+                index: "id",
                 layout: "fitDataStretch",
-                height: "680px",
+                height: "700px",
                 movableColumns: true,
+                dataTree: true,
+                dataTreeStartExpanded: false,
                 columnDefaults: {
                     headerSort: true,
                     resizable: true,
@@ -525,79 +460,39 @@
             });
         }
 
-        async function loadGroups() {
-            try {
-                const response = await fetch("{% url 'employee-groups-data' %}");
-                const payload = await response.json();
-                if (!response.ok || payload.status !== "ok") {
-                    throw new Error(payload.message || "Не удалось загрузить группы сотрудников.");
-                }
-
-                groupFilter.innerHTML = "";
-                payload.groups.forEach((group) => {
-                    const label = document.createElement("label");
-                    label.className = "group-checkbox";
-
-                    const checkbox = document.createElement("input");
-                    checkbox.type = "checkbox";
-                    checkbox.value = group.id;
-                    checkbox.checked = group.name.trim() === "ТКЗ ИЦ СПБ";
-                    checkbox.addEventListener("change", () => {
-                        updateGroupsToggleText();
-                        resetVisibleTable();
-                    });
-
-                    const text = document.createElement("span");
-                    text.textContent = group.name;
-
-                    label.appendChild(checkbox);
-                    label.appendChild(text);
-                    groupFilter.appendChild(label);
-                });
-
-                if (payload.groups.length === 0) {
-                    groupFilter.innerHTML = '<span class="groups-placeholder">Группы не найдены</span>';
-                }
-                updateGroupsToggleText();
-            } catch (error) {
-                groupFilter.innerHTML = '<span class="groups-placeholder">Ошибка загрузки групп</span>';
-                updateGroupsToggleText();
-                showStatus(error.message, "error");
-            }
-        }
-
-        async function loadTable() {
+        async function loadReport() {
             clearStatus();
             loadButton.disabled = true;
             loadButton.textContent = "Загрузка...";
 
             try {
-                const response = await fetch(`{% url 'employee-report-data' %}?${getReportParams()}`);
+                const response = await fetch(`{% url 'project-report-data' %}?${getReportParams()}`);
                 const payload = await response.json();
                 if (!response.ok || payload.status !== "ok") {
-                    throw new Error(payload.message || "Не удалось загрузить отчёт.");
+                    throw new Error(payload.message || "Не удалось загрузить отчёт по проектам.");
                 }
 
                 tablePanel.classList.add("visible");
+                loadedProjectStatus = payload.project_status || projectStatusFilter.value;
+                projectStatusFilter.value = loadedProjectStatus;
                 buildTable(payload.rows, payload.months);
-                showStatus("Отчёт по сотрудникам загружен.", "success");
+                if (payload.opr_project_found) {
+                    showStatus("Отчёт по проектам загружен.", "success");
+                } else {
+                    showStatus("Отчёт загружен, но проект ОПР не найден: общепроизводственные расходы не распределены.", "error");
+                }
             } catch (error) {
                 showStatus(error.message, "error");
             } finally {
                 loadButton.disabled = false;
-                loadButton.textContent = "Получить список пользователей";
+                loadButton.textContent = "Отобразить отчёт по проектам";
             }
         }
 
-        groupsToggle.addEventListener("click", () => {
-            groupFilter.classList.toggle("visible");
-            groupsToggle.classList.toggle("open");
-        });
-        statusFilter.addEventListener("change", resetVisibleTable);
-        loadButton.addEventListener("click", loadTable);
+        loadButton.addEventListener("click", loadReport);
         yearSelect.addEventListener("change", resetVisibleTable);
+        projectStatusFilter.addEventListener("change", resetVisibleTable);
         quarterInputs.forEach((input) => input.addEventListener("change", resetVisibleTable));
-        loadGroups();
     </script>
 </body>
 </html>
