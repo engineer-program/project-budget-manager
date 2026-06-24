@@ -55,3 +55,53 @@ class SyncLog(models.Model):
     class Meta:
         db_table = "sync_log"
         ordering = ["-started_at"]
+
+
+class SyncRun(models.Model):
+    MODE_INCREMENTAL = "incremental"
+    MODE_WINDOW = "window"
+    MODE_FULL = "full"
+
+    STATUS_RUNNING = "running"
+    STATUS_SUCCESS = "success"
+    STATUS_FAILED = "failed"
+    STATUS_PARTIAL = "partial"
+
+    mode = models.CharField(max_length=50)
+    trigger_source = models.CharField(max_length=100)
+    triggered_by = models.CharField(max_length=150, blank=True)
+    status = models.CharField(max_length=50, default=STATUS_RUNNING)
+    started_at = models.DateTimeField()
+    finished_at = models.DateTimeField(null=True, blank=True)
+    duration_seconds = models.PositiveIntegerField(null=True, blank=True)
+    log_file_path = models.CharField(max_length=500, blank=True)
+    error_message = models.TextField(blank=True)
+
+    employees_created = models.PositiveIntegerField(default=0)
+    employees_updated = models.PositiveIntegerField(default=0)
+    employees_deleted = models.PositiveIntegerField(default=0)
+    employees_skipped = models.PositiveIntegerField(default=0)
+
+    groups_created = models.PositiveIntegerField(default=0)
+    groups_updated = models.PositiveIntegerField(default=0)
+    groups_deleted = models.PositiveIntegerField(default=0)
+    groups_skipped = models.PositiveIntegerField(default=0)
+
+    group_memberships_created = models.PositiveIntegerField(default=0)
+    group_memberships_updated = models.PositiveIntegerField(default=0)
+    group_memberships_deleted = models.PositiveIntegerField(default=0)
+    group_memberships_skipped = models.PositiveIntegerField(default=0)
+
+    projects_created = models.PositiveIntegerField(default=0)
+    projects_updated = models.PositiveIntegerField(default=0)
+    projects_deleted = models.PositiveIntegerField(default=0)
+    projects_skipped = models.PositiveIntegerField(default=0)
+
+    time_entries_created = models.PositiveIntegerField(default=0)
+    time_entries_updated = models.PositiveIntegerField(default=0)
+    time_entries_deleted = models.PositiveIntegerField(default=0)
+    time_entries_skipped = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "sync_runs"
+        ordering = ["-started_at"]

@@ -39,6 +39,7 @@ def run_incremental_sync_view(request: HttpRequest) -> JsonResponse:
         trigger_source="ui-incremental",
         time_entries_mode=SyncService.TIME_ENTRIES_MODE_INCREMENTAL,
         chunk_size=SyncService.DEFAULT_CHUNK_SIZE,
+        triggered_by=request.user.get_username(),
     )
     return JsonResponse(
         {
@@ -58,6 +59,7 @@ def run_window_sync_view(request: HttpRequest) -> JsonResponse:
         time_entries_mode=SyncService.TIME_ENTRIES_MODE_WINDOW,
         chunk_size=SyncService.DEFAULT_CHUNK_SIZE,
         window_days=SyncService.DEFAULT_WINDOW_DAYS,
+        triggered_by=request.user.get_username(),
     )
     return JsonResponse(
         {
@@ -85,6 +87,7 @@ def run_full_sync_view(request: HttpRequest) -> JsonResponse:
         trigger_source="ui-full",
         time_entries_mode=SyncService.TIME_ENTRIES_MODE_FULL,
         chunk_size=SyncService.DEFAULT_CHUNK_SIZE,
+        triggered_by=request.user.get_username(),
     )
     return JsonResponse(
         {
