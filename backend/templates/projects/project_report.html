@@ -208,6 +208,13 @@
             display: block;
         }
 
+        .export-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
         #project-report-table {
             border: 1px solid rgba(33, 49, 61, 0.08);
             border-radius: 8px;
@@ -325,10 +332,19 @@
 
         <section id="table-panel" class="panel table-panel">
             <div id="project-report-table"></div>
+            <div class="export-actions">
+                <button id="export-excel-button" class="button" type="button" disabled>
+                    Экспорт Excel
+                </button>
+                <button id="export-pdf-button" class="button" type="button" disabled>
+                    Экспорт PDF
+                </button>
+            </div>
         </section>
     </div>
 
     <script src="{% static 'vendor/tabulator/tabulator.min.js' %}"></script>
+    <script src="{% static 'js/table_export.js' %}"></script>
     <script>
         const yearSelect = document.getElementById("year-filter");
         const quarterInputs = Array.from(document.querySelectorAll(".quarter-option input"));
@@ -336,7 +352,11 @@
         const loadButton = document.getElementById("load-table-button");
         const tablePanel = document.getElementById("table-panel");
         const statusMessage = document.getElementById("status-message");
+        const exportExcelButton = document.getElementById("export-excel-button");
+        const exportPdfButton = document.getElementById("export-pdf-button");
         let table = null;
+        let exportColumns = [];
+        let exportRows = [];
         let statusTimer = null;
         let loadedProjectStatus = "open";
 
@@ -360,7 +380,46 @@
 
         function resetVisibleTable() {
             tablePanel.classList.remove("visible");
+            setExportButtonsEnabled(false);
             clearStatus();
+        }
+
+        function setExportButtonsEnabled(enabled) {
+            exportExcelButton.disabled = !enabled;
+            exportPdfButton.disabled = !enabled;
+        }
+
+        function getSelectedOptionText(select) {
+            return select.options[select.selectedIndex]?.textContent.trim() || select.value;
+        }
+
+        function selectedQuarterTitles() {
+            const quarters = quarterInputs
+                .filter((input) => input.checked)
+                .map((input) => ["", "I", "II", "III", "IV"][Number(input.value)]);
+            return quarters.length ? quarters.join(",") : "без кварталов";
+        }
+
+        function getProjectReportExportFileName() {
+            return `Отчет по проектам - ${yearSelect.value} - ${selectedQuarterTitles()} кв. - ${getSelectedOptionText(projectStatusFilter)}`;
+        }
+
+        function exportProjectReport(format) {
+            if (!table || !tablePanel.classList.contains("visible")) {
+                showStatus("Сначала загрузите отчёт для экспорта.", "error");
+                return;
+            }
+            const fileName = getProjectReportExportFileName();
+            const exportOptions = {columns: exportColumns, rows: exportRows};
+            try {
+                if (format === "excel") {
+                    ProjectBudgetTableExport.exportExcel(table, fileName, "Отчет по проектам", exportOptions);
+                } else {
+                    ProjectBudgetTableExport.exportPdf(table, fileName, fileName, exportOptions);
+                }
+            } catch (error) {
+                showStatus(error.message || "Не удалось выполнить экспорт.", "error");
+            }
         }
 
         function normalizeMoney(value) {
@@ -437,6 +496,8 @@
 
         function buildTable(rows, months) {
             const columns = buildColumns(months);
+            exportColumns = columns;
+            exportRows = rows;
             if (table) {
                 table.setColumns(columns);
                 table.replaceData(rows);
@@ -476,6 +537,7 @@
                 loadedProjectStatus = payload.project_status || projectStatusFilter.value;
                 projectStatusFilter.value = loadedProjectStatus;
                 buildTable(payload.rows, payload.months);
+                setExportButtonsEnabled(true);
                 if (payload.opr_project_found) {
                     showStatus("Отчёт по проектам загружен.", "success");
                 } else {
@@ -490,6 +552,8 @@
         }
 
         loadButton.addEventListener("click", loadReport);
+        exportExcelButton.addEventListener("click", () => exportProjectReport("excel"));
+        exportPdfButton.addEventListener("click", () => exportProjectReport("pdf"));
         yearSelect.addEventListener("change", resetVisibleTable);
         projectStatusFilter.addEventListener("change", resetVisibleTable);
         quarterInputs.forEach((input) => input.addEventListener("change", resetVisibleTable));
