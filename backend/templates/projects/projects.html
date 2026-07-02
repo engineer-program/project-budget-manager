@@ -68,9 +68,12 @@
 
         .project-filters {
             justify-content: center;
-            flex-wrap: flex-center;
+            flex-wrap: nowrap;
             margin-bottom: 22px;
-            width: 500px;
+        }
+
+        .project-filters .field {
+            flex: 0 0 200px;
         }
 
         .topbar {
@@ -145,6 +148,13 @@
 
         #projects-table .strong-border-right {
             border-right: 2px solid #9aa8b2;
+        }
+
+        .export-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 16px;
         }
 
         .status-message {
@@ -404,6 +414,14 @@
                 </button>
             </div>
             <div id="projects-table"></div>
+            <div class="export-actions">
+                <button id="export-excel-button" class="button" type="button" disabled>
+                    Экспорт Excel
+                </button>
+                <button id="export-pdf-button" class="button" type="button" disabled>
+                    Экспорт PDF
+                </button>
+            </div>
         </section>
     </div>
 
@@ -530,6 +548,7 @@
     </div>
 
     <script src="{% static 'vendor/tabulator/tabulator.min.js' %}"></script>
+    <script src="{% static 'js/table_export.js' %}"></script>
     <script>
         let projectsTable = null;
         let incomesTable = null;
@@ -537,11 +556,14 @@
         let pendingIncomeDeleteId = null;
         let statusTimer = null;
         let loadedProjectStatus = "open";
+        let projectsExportRows = [];
 
         const statusMessage = document.getElementById("status-message");
         const projectsTableElement = document.getElementById("projects-table");
         const projectStatusFilter = document.getElementById("project-status-filter");
         const refreshProjectsButton = document.getElementById("refresh-projects-button");
+        const exportExcelButton = document.getElementById("export-excel-button");
+        const exportPdfButton = document.getElementById("export-pdf-button");
         const toastContainer = document.getElementById("toast-container");
         const projectCardBackdrop = document.getElementById("project-card-backdrop");
         const incomesBackdrop = document.getElementById("incomes-backdrop");
@@ -627,6 +649,38 @@
             refreshProjectsButton.disabled = !statusChanged && Boolean(projectsTable);
             if (statusChanged) {
                 projectsTableElement.style.display = "none";
+                setExportButtonsEnabled(false);
+            }
+        }
+
+        function setExportButtonsEnabled(enabled) {
+            exportExcelButton.disabled = !enabled;
+            exportPdfButton.disabled = !enabled;
+        }
+
+        function getSelectedOptionText(select) {
+            return select.options[select.selectedIndex]?.textContent.trim() || select.value;
+        }
+
+        function getProjectsExportFileName() {
+            return `Проекты - ${getSelectedOptionText(projectStatusFilter)}`;
+        }
+
+        function exportProjects(format) {
+            if (!projectsTable || projectsTableElement.style.display === "none") {
+                showStatus("Сначала обновите список проектов для экспорта.", "error");
+                return;
+            }
+            const fileName = getProjectsExportFileName();
+            const exportOptions = {rows: projectsExportRows};
+            try {
+                if (format === "excel") {
+                    ProjectBudgetTableExport.exportExcel(projectsTable, fileName, "Проекты", exportOptions);
+                } else {
+                    ProjectBudgetTableExport.exportPdf(projectsTable, fileName, fileName, exportOptions);
+                }
+            } catch (error) {
+                showStatus(error.message || "Не удалось выполнить экспорт.", "error");
             }
         }
 
@@ -638,12 +692,14 @@
             try {
                 const params = new URLSearchParams({project_status: projectStatusFilter.value});
                 const payload = await requestJson(`{% url 'projects-data' %}?${params}`);
+                projectsExportRows = payload.rows || [];
                 loadedProjectStatus = payload.project_status || projectStatusFilter.value;
                 projectStatusFilter.value = loadedProjectStatus;
                 projectsTableElement.style.display = "";
                 updateRefreshProjectsButton();
                 if (projectsTable) {
                     projectsTable.replaceData(payload.rows);
+                    setExportButtonsEnabled(true);
                     showStatus("Список проектов обновлён.", "success");
                     return;
                 }
@@ -670,6 +726,7 @@
                         moneyColumn("Суммарные расходы", "total_expense", widthGrow = 1.05),
                     ],
                 });
+                setExportButtonsEnabled(true);
                 showStatus("Список проектов загружен.", "success");
             } catch (error) {
                 showStatus(error.message, "error");
@@ -877,6 +934,8 @@
         document.getElementById("confirm-delete-income-button").addEventListener("click", deleteIncome);
         projectStatusFilter.addEventListener("change", updateRefreshProjectsButton);
         refreshProjectsButton.addEventListener("click", loadProjects);
+        exportExcelButton.addEventListener("click", () => exportProjects("excel"));
+        exportPdfButton.addEventListener("click", () => exportProjects("pdf"));
 
         loadProjects();
     </script>

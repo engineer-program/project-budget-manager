@@ -15,18 +15,21 @@ from apps.projects.models import Project
 from apps.redmine_sync.models import RedmineTimeEntry, SyncLog, SyncState
 
 from .redmine_reader import RedmineReader
+from .sync_run_logger import SyncRunLogger
 
 
 @dataclass
 class SyncStats:
     created: int = 0
     updated: int = 0
+    deleted: int = 0
     skipped: int = 0
 
     def as_dict(self) -> dict[str, int]:
         return {
             "created": self.created,
             "updated": self.updated,
+            "deleted": self.deleted,
             "skipped": self.skipped,
         }
 
@@ -45,6 +48,7 @@ class SyncService:
 
     def __init__(self, reader: RedmineReader | None = None) -> None:
         self.reader = reader or RedmineReader()
+        self.run_logger: SyncRunLogger | None = None
 
     def run(
         self,
@@ -53,7 +57,15 @@ class SyncService:
         time_entries_mode: str = TIME_ENTRIES_MODE_INCREMENTAL,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         window_days: int = DEFAULT_WINDOW_DAYS,
+        triggered_by: str = "",
     ) -> dict[str, dict[str, int]]:
+        self.run_logger = SyncRunLogger(
+            mode=time_entries_mode,
+            trigger_source=trigger_source,
+            triggered_by=triggered_by,
+            chunk_size=chunk_size,
+            window_days=window_days if time_entries_mode == self.TIME_ENTRIES_MODE_WINDOW else None,
+        )
         log = SyncLog.objects.create(
             trigger_source=trigger_source,
             status="running",
@@ -63,26 +75,36 @@ class SyncService:
 
         try:
             details["employees"] = self.sync_employees().as_dict()
+            self.run_logger.record_section_result("employees", details["employees"])
             details["groups"] = self.sync_groups().as_dict()
+            self.run_logger.record_section_result("groups", details["groups"])
             details["group_memberships"] = self.sync_group_memberships().as_dict()
+            self.run_logger.record_section_result("group_memberships", details["group_memberships"])
             details["projects"] = self.sync_projects().as_dict()
+            self.run_logger.record_section_result("projects", details["projects"])
             self.ensure_technical_employees()
             details["time_entries"] = self.sync_time_entries(
                 mode=time_entries_mode,
                 chunk_size=chunk_size,
                 window_days=window_days,
             ).as_dict()
+            self.run_logger.record_section_result("time_entries", details["time_entries"])
             log.status = "success"
             log.details = self._format_details(details)
             log.finished_at = timezone.now()
             log.save(update_fields=["status", "details", "finished_at"])
+            self.run_logger.finalize_success(details)
             return details
         except Exception as exc:
             log.status = "failed"
             log.details = str(exc)
             log.finished_at = timezone.now()
             log.save(update_fields=["status", "details", "finished_at"])
+            if self.run_logger is not None:
+                self.run_logger.finalize_failed(exc)
             raise
+        finally:
+            self.run_logger = None
 
     def sync_employees(self) -> SyncStats:
         stats = SyncStats()
@@ -142,15 +164,32 @@ class SyncService:
                     batch_size=500,
                 )
 
-            deleted_count = Employee.objects.exclude(redmine_id__in=redmine_ids).filter(
-                is_deleted_in_redmine=False,
+            deleted_employees = list(
+                Employee.objects.exclude(redmine_id__in=redmine_ids)
+                .filter(is_deleted_in_redmine=False)
+                .values(
+                    "id",
+                    "redmine_id",
+                    "first_name",
+                    "last_name",
+                    "patronymic",
+                    "email",
+                    "active",
+                )
+            )
+            deleted_count = Employee.objects.filter(
+                id__in=[employee["id"] for employee in deleted_employees],
             ).update(
                 is_deleted_in_redmine=True,
                 synced_at=now,
             )
 
         stats.created = len(employees_to_create)
-        stats.updated = len(employees_to_update) + deleted_count
+        stats.updated = len(employees_to_update)
+        stats.deleted = deleted_count
+        if self.run_logger is not None:
+            for employee in deleted_employees:
+                self.run_logger.record_employee_deleted(employee)
         self._mark_state("employees", "success", stats)
         return stats
 
@@ -252,7 +291,7 @@ class SyncService:
                 )
 
         stats.created = len(pairs_to_create)
-        stats.updated = len(pairs_to_delete)
+        stats.deleted = len(pairs_to_delete)
         self._mark_state("group_memberships", "success", stats)
         return stats
 
@@ -331,8 +370,13 @@ class SyncService:
                     batch_size=500,
                 )
 
-            deleted_count = Project.objects.exclude(redmine_project_id__in=redmine_project_ids).filter(
-                is_deleted_in_redmine=False,
+            deleted_projects = list(
+                Project.objects.exclude(redmine_project_id__in=redmine_project_ids)
+                .filter(is_deleted_in_redmine=False)
+                .values("id", "redmine_project_id", "name", "project_number", "status")
+            )
+            deleted_count = Project.objects.filter(
+                id__in=[project["id"] for project in deleted_projects],
             ).update(
                 is_deleted_in_redmine=True,
                 synced_at=now,
@@ -386,7 +430,11 @@ class SyncService:
         }
 
         stats.created = len(projects_to_create)
-        stats.updated = len(updated_project_ids) + deleted_count
+        stats.updated = len(updated_project_ids)
+        stats.deleted = deleted_count
+        if self.run_logger is not None:
+            for project in deleted_projects:
+                self.run_logger.record_project_deleted(project)
         self._mark_state("projects", "success", stats)
         return stats
 
@@ -441,7 +489,6 @@ class SyncService:
             stats,
             cursor_int=after_id if mode == self.TIME_ENTRIES_MODE_INCREMENTAL else None,
         )
-        deleted_count = 0
         if mode == self.TIME_ENTRIES_MODE_FULL:
             deleted_count = self._reconcile_deleted_time_entries_full()
         elif mode == self.TIME_ENTRIES_MODE_WINDOW:
@@ -450,9 +497,11 @@ class SyncService:
         elif mode == self.TIME_ENTRIES_MODE_INCREMENTAL:
             reconcile_start = date.today() - timedelta(days=self.DEFAULT_INCREMENTAL_RECONCILE_DAYS)
             deleted_count = self._reconcile_deleted_time_entries_by_spent_on(start_date=reconcile_start)
+        else:
+            deleted_count = 0
 
         if deleted_count:
-            stats.updated += deleted_count
+            stats.deleted += deleted_count
             self._mark_state(
                 state_code,
                 "success",
@@ -463,11 +512,27 @@ class SyncService:
 
     def _reconcile_deleted_time_entries_full(self) -> int:
         redmine_ids = set(self.reader.fetch_time_entry_ids())
-        return (
+        deleted_entries = list(
             RedmineTimeEntry.objects.exclude(redmine_time_entry_id__in=redmine_ids)
             .filter(is_deleted_in_redmine=False)
-            .update(is_deleted_in_redmine=True)
+            .values(
+                "id",
+                "redmine_time_entry_id",
+                "project_id",
+                "user_id",
+                "issue_id",
+                "hours",
+                "activity_id",
+                "spent_on",
+            )
         )
+        deleted_count = RedmineTimeEntry.objects.filter(
+            id__in=[entry["id"] for entry in deleted_entries],
+        ).update(is_deleted_in_redmine=True)
+        if self.run_logger is not None:
+            for entry in deleted_entries:
+                self.run_logger.record_time_entry_deleted(entry)
+        return deleted_count
 
     def _reconcile_deleted_time_entries_by_spent_on(
         self,
@@ -488,7 +553,25 @@ class SyncService:
         if end_date is not None:
             queryset = queryset.filter(spent_on__lte=end_date)
 
-        return queryset.exclude(redmine_time_entry_id__in=redmine_ids).update(is_deleted_in_redmine=True)
+        deleted_entries = list(
+            queryset.exclude(redmine_time_entry_id__in=redmine_ids).values(
+                "id",
+                "redmine_time_entry_id",
+                "project_id",
+                "user_id",
+                "issue_id",
+                "hours",
+                "activity_id",
+                "spent_on",
+            )
+        )
+        deleted_count = RedmineTimeEntry.objects.filter(
+            id__in=[entry["id"] for entry in deleted_entries],
+        ).update(is_deleted_in_redmine=True)
+        if self.run_logger is not None:
+            for entry in deleted_entries:
+                self.run_logger.record_time_entry_deleted(entry)
+        return deleted_count
 
     def _sync_time_entries_chunk(self, payload: list[dict[str, object]]) -> SyncStats:
         stats = SyncStats()
@@ -527,8 +610,29 @@ class SyncService:
             project = project_map.get(item["redmine_project_id"])
             employee = employee_map.get(item["redmine_user_id"])
 
-            if not project or not employee:
+            if not project and not employee:
                 stats.skipped += 1
+                if self.run_logger is not None:
+                    self.run_logger.record_time_entry_skipped(
+                        item,
+                        "проект и сотрудник не найдены или помечены удалёнными",
+                    )
+                continue
+            if not project:
+                stats.skipped += 1
+                if self.run_logger is not None:
+                    self.run_logger.record_time_entry_skipped(
+                        item,
+                        "проект не найден или помечен удалённым",
+                    )
+                continue
+            if not employee:
+                stats.skipped += 1
+                if self.run_logger is not None:
+                    self.run_logger.record_time_entry_skipped(
+                        item,
+                        "сотрудник не найден или помечен удалённым",
+                    )
                 continue
 
             issue_id = item.get("issue_id")
@@ -557,36 +661,56 @@ class SyncService:
                 continue
 
             changed = False
+            changes: dict[str, tuple[object, object]] = {}
             if time_entry.project_id != project.id:
+                changes["project_id"] = (time_entry.project_id, project.id)
                 time_entry.project_id = project.id
                 changed = True
             if time_entry.user_id != employee.id:
+                changes["user_id"] = (time_entry.user_id, employee.id)
                 time_entry.user_id = employee.id
                 changed = True
             if time_entry.issue_id != issue_id:
+                changes["issue_id"] = (time_entry.issue_id, issue_id)
                 time_entry.issue_id = issue_id
                 changed = True
             if time_entry.hours != hours:
+                changes["hours"] = (time_entry.hours, hours)
                 time_entry.hours = hours
                 changed = True
             if time_entry.activity_id != activity_id:
+                changes["activity_id"] = (time_entry.activity_id, activity_id)
                 time_entry.activity_id = activity_id
                 changed = True
             if time_entry.spent_on != spent_on:
+                changes["spent_on"] = (time_entry.spent_on, spent_on)
                 time_entry.spent_on = spent_on
                 changed = True
             if time_entry.created_at != created_at:
+                changes["created_at"] = (time_entry.created_at, created_at)
                 time_entry.created_at = created_at
                 changed = True
             if time_entry.redmine_updated_on != redmine_updated_on:
+                changes["redmine_updated_on"] = (time_entry.redmine_updated_on, redmine_updated_on)
                 time_entry.redmine_updated_on = redmine_updated_on
                 changed = True
             if time_entry.is_deleted_in_redmine:
+                changes["is_deleted_in_redmine"] = (True, False)
                 time_entry.is_deleted_in_redmine = False
                 changed = True
 
             if changed:
                 time_entries_to_update.append(time_entry)
+                if self.run_logger is not None:
+                    self.run_logger.record_time_entry_updated(
+                        redmine_time_entry_id=time_entry.redmine_time_entry_id,
+                        employee_name=self._format_employee_name(employee),
+                        employee_id=employee.id,
+                        redmine_user_id=employee.redmine_id,
+                        issue_id=issue_id,
+                        spent_on=spent_on,
+                        changes=changes,
+                    )
 
         with transaction.atomic():
             if time_entries_to_create:
@@ -676,6 +800,18 @@ class SyncService:
 
     def _format_details(self, details: dict[str, int] | dict[str, dict[str, int]]) -> str:
         return str(details)
+
+    def _format_employee_name(self, employee: Employee) -> str:
+        full_name = " ".join(
+            part
+            for part in (
+                employee.last_name,
+                employee.first_name,
+                employee.patronymic,
+            )
+            if part
+        ).strip()
+        return full_name or f"employee_id={employee.id}"
 
     def _normalize_datetime(self, value: datetime | None) -> datetime:
         if value is None:

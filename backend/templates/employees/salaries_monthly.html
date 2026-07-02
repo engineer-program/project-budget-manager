@@ -328,6 +328,13 @@
             display: block;
         }
 
+        .export-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
         .dirty-counter {
             color: var(--text-muted);
             font-size: 0.95rem;
@@ -591,6 +598,14 @@
                 </div>
             </div>
             <div id="salary-table"></div>
+            <div class="export-actions">
+                <button id="export-excel-button" class="button" type="button" disabled>
+                    Экспорт Excel
+                </button>
+                <button id="export-pdf-button" class="button" type="button" disabled>
+                    Экспорт PDF
+                </button>
+            </div>
         </section>
     </div>
 
@@ -799,6 +814,7 @@
     </div>
 
     <script src="{% static 'vendor/tabulator/tabulator.min.js' %}"></script>
+    <script src="{% static 'js/table_export.js' %}"></script>
     <script>
         const monthSelect = document.getElementById("{{ form.month.id_for_label }}");
         const yearSelect = document.getElementById("{{ form.year.id_for_label }}");
@@ -809,6 +825,8 @@
         const copyColumnsButton = document.getElementById("copy-columns-button");
         const clearColumnsButton = document.getElementById("clear-columns-button");
         const saveButton = document.getElementById("save-table-button");
+        const exportExcelButton = document.getElementById("export-excel-button");
+        const exportPdfButton = document.getElementById("export-pdf-button");
         const tablePanel = document.getElementById("table-panel");
         const statusMessage = document.getElementById("status-message");
         const dirtyCounter = document.getElementById("dirty-counter");
@@ -878,6 +896,38 @@
                 params.append("group_ids", checkbox.value);
             });
             return params;
+        }
+
+        function setExportButtonsEnabled(enabled) {
+            exportExcelButton.disabled = !enabled;
+            exportPdfButton.disabled = !enabled;
+        }
+
+        function getSelectedOptionText(select) {
+            return select.options[select.selectedIndex]?.textContent.trim() || select.value;
+        }
+
+        function getSalaryExportFileName() {
+            const month = String(monthSelect.value).padStart(2, "0");
+            const statusTitle = getSelectedOptionText(statusFilter);
+            return `ЗП сотрудников - ${month}.${yearSelect.value} - ${statusTitle}`;
+        }
+
+        function exportSalaryTable(format) {
+            if (!table || !tablePanel.classList.contains("visible")) {
+                showStatus("Сначала загрузите таблицу для экспорта.", "error");
+                return;
+            }
+            const fileName = getSalaryExportFileName();
+            try {
+                if (format === "excel") {
+                    ProjectBudgetTableExport.exportExcel(table, fileName, "ЗП сотрудников");
+                } else {
+                    ProjectBudgetTableExport.exportPdf(table, fileName, fileName);
+                }
+            } catch (error) {
+                showStatus(error.message || "Не удалось выполнить экспорт.", "error");
+            }
         }
 
         function updateGroupsToggleText() {
@@ -1452,6 +1502,7 @@
 
         function resetVisibleTable() {
             tablePanel.classList.remove("visible");
+            setExportButtonsEnabled(false);
             dirtyRows.clear();
             updateDirtyCounter();
             clearStatus();
@@ -1471,6 +1522,7 @@
 
                 tablePanel.classList.add("visible");
                 buildTable(payload.rows);
+                setExportButtonsEnabled(true);
                 showStatus(successMessage, "success");
             } catch (error) {
                 showStatus(error.message, "error");
@@ -1524,6 +1576,8 @@
         }
 
         loadButton.addEventListener("click", () => loadTable());
+        exportExcelButton.addEventListener("click", () => exportSalaryTable("excel"));
+        exportPdfButton.addEventListener("click", () => exportSalaryTable("pdf"));
         copyColumnsButton.addEventListener("click", openCopyColumnsModal);
         clearColumnsButton.addEventListener("click", openClearColumnsModal);
         saveButton.addEventListener("click", saveTable);
