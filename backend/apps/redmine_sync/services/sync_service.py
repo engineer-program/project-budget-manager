@@ -90,7 +90,7 @@ class SyncService:
             ).as_dict()
             self.run_logger.record_section_result("time_entries", details["time_entries"])
             log.status = "success"
-            log.details = self._format_details(details)
+            log.details = str(details)
             log.finished_at = timezone.now()
             log.save(update_fields=["status", "details", "finished_at"])
             self.run_logger.finalize_success(details)
@@ -773,7 +773,7 @@ class SyncService:
             "last_synced_at": now,
             "last_success_at": now if status == "success" else None,
             "status": status,
-            "message": self._format_details(stats.as_dict()),
+            "message": str(stats.as_dict()),
         }
         if cursor_int is not None:
             defaults["cursor_int"] = cursor_int
@@ -797,9 +797,6 @@ class SyncService:
         if match:
             return match.group("name").strip()
         return name
-
-    def _format_details(self, details: dict[str, int] | dict[str, dict[str, int]]) -> str:
-        return str(details)
 
     def _format_employee_name(self, employee: Employee) -> str:
         full_name = " ".join(
