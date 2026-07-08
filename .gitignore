@@ -210,4 +210,8 @@ design/docs/algorithm/tabel_plugin_specification.md
 design/docs/algorithm/technical_specification.md
 design/docs/algorithm/edits.md
 design/docs/algorithm/questions.md
-docs
+design/docs/algorithm/redmine_db_architecture.md
+referenses/
+var/
+node_modules/
+docker-compose.prod.yml
