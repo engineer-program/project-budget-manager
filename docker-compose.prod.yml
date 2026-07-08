@@ -1,0 +1,42 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    working_dir: /app
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+    volumes:
+      - ./var/sync_logs:/var/sync_logs
+      - staticfiles:/app/staticfiles
+      - media:/app/media
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    working_dir: /app
+    command: python manage.py run_sync_scheduler --poll-seconds 60
+    volumes:
+      - ./var/sync_logs:/var/sync_logs
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - staticfiles:/staticfiles:ro
+      - media:/media:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  staticfiles:
+  media:
