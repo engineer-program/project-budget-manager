@@ -1,8 +1,8 @@
 (function () {
     function stripHtml(value) {
-        const element = document.createElement("div");
-        element.innerHTML = String(value || "");
-        return (element.textContent || element.innerText || "").trim();
+        return String(value || "")
+            .replace(/<[^>]*>/g, "")
+            .trim();
     }
 
     function sanitizeFileName(value) {
