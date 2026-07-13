@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.views import LoginView, LogoutView
-from django.urls import include, path
+from django.urls import include, path, re_path
+from django.contrib.staticfiles.views import serve
 
 from apps.projects.views import project_report_page_view
 
@@ -37,4 +38,8 @@ urlpatterns = [
     ),
     path("health/", healthcheck_view, name="healthcheck"),
     path("", home_view, name="home"),
+]
+
+urlpatterns += [
+    re_path(r"^static/(?P<path>.*)$", serve),
 ]
