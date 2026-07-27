@@ -372,6 +372,12 @@ cd /path/to/project-budget-manager
 git pull
 ```
 
+Остановить контейнеры, удалить контейнеры и образы:
+
+```bash
+docker compose -f docker-compose.yml down --rmi all
+```
+
 Пересобрать контейнеры:
 
 ```bash
